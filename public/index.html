@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BeanStock — Sentiment & Stock Analysis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ── Onboarding Overlay ─────────────────────────────────────────────────── -->
+<div id="onboarding" class="onboarding hidden">
+  <div class="ob-card">
+    <div class="ob-logo">🫘 BeanStock</div>
+    <h1 class="ob-title">Welcome! Let's get you set up.</h1>
+    <p class="ob-sub">BeanStock needs two free API keys to show live stock data and Reddit sentiment. Takes about 3 minutes.</p>
+
+    <div class="ob-steps">
+      <div class="ob-step" id="ob1">
+        <div class="ob-num">1</div>
+        <div class="ob-step-body">
+          <div class="ob-step-title">Get a free Finnhub API key <span class="ob-tag required">Required</span></div>
+          <div class="ob-step-desc">Powers all stock prices, charts, and metrics. Free tier gives you 60 API calls/min — more than enough.</div>
+          <a class="ob-link" href="https://finnhub.io" target="_blank" rel="noopener">Sign up at finnhub.io →</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="ob-env">
+      <div class="ob-env-label">Create a <code>.env</code> file in the <code>beanstock/</code> folder with:</div>
+      <pre class="ob-code">FINNHUB_API_KEY=your_key_here</pre>
+      <div class="ob-env-label" style="margin-top:10px">Reddit sentiment works automatically — no credentials needed.</div>
+    </div>
+
+    <div class="ob-actions">
+      <button class="btn-primary btn-lg" onclick="window.location.reload()">I've added my keys — Reload</button>
+      <button class="btn-ghost" onclick="dismissOnboarding()">Skip for now</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Sidebar ─────────────────────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="logo">
+    <span class="logo-mark">🫘</span>
+    <span class="logo-name">BeanStock</span>
+  </div>
+  <nav class="nav">
+    <button class="nav-btn active" data-view="dashboard">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button class="nav-btn" data-view="search">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <span>Search Stock</span>
+    </button>
+    <button class="nav-btn" data-view="sectors">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M11 2v20c-5.07-.5-9-4.79-9-10s3.93-9.5 9-10zm2.03 0v8.99H22c-.47-4.74-4.24-8.52-8.97-8.99zm0 11.01V22c4.74-.47 8.5-4.25 8.97-8.99h-8.97z"/></svg>
+      <span>Sectors</span>
+    </button>
+    <button class="nav-btn" data-view="reddit">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+      <span>Reddit Feed</span>
+    </button>
+    <button class="nav-btn" data-view="learn">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>
+      <span>Trading 101</span>
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="market-pill" id="marketPill">⬤ Checking…</div>
+  </div>
+</aside>
+
+<!-- ── Main ───────────────────────────────────────────────────────────────── -->
+<main class="main">
+
+  <!-- Header -->
+  <header class="topbar">
+    <div class="topbar-search">
+      <svg viewBox="0 0 24 24" class="ts-icon"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <input id="globalSearch" type="text" placeholder="Quick search — ticker or company…" autocomplete="off" spellcheck="false" />
+      <kbd class="search-kbd">/</kbd>
+      <div id="searchDrop" class="search-drop hidden"></div>
+    </div>
+    <div id="setupBanner" class="setup-banner hidden">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+      <span id="setupBannerText"></span>
+      <button class="banner-btn" onclick="showOnboarding()">Setup guide</button>
+      <button class="banner-close" onclick="this.closest('.setup-banner').classList.add('hidden')">✕</button>
+    </div>
+  </header>
+
+  <!-- ── Dashboard ──────────────────────────────────────────────────────── -->
+  <div id="view-dashboard" class="view active">
+    <div class="hero-section">
+      <div class="hero-text">
+        <h1 class="hero-title">Track stocks.<br>Read the room.</h1>
+        <p class="hero-sub">Real-time prices, Reddit sentiment, and beginner-friendly analysis — all in one place.</p>
+      </div>
+      <div class="hero-search">
+        <div class="hero-search-wrap">
+          <svg viewBox="0 0 24 24" class="hs-icon"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          <input id="heroSearch" type="text" placeholder="Try AAPL, TSLA, NVDA…" autocomplete="off" />
+          <button class="btn-primary" id="heroSearchBtn">Search</button>
+        </div>
+        <div class="hero-hints">
+          <button class="hint-chip" data-ticker="AAPL">AAPL</button>
+          <button class="hint-chip" data-ticker="NVDA">NVDA</button>
+          <button class="hint-chip" data-ticker="TSLA">TSLA</button>
+          <button class="hint-chip" data-ticker="AMZN">AMZN</button>
+          <button class="hint-chip" data-ticker="MSFT">MSFT</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-row" id="statsRow">
+      <div class="stat-card loading"><div class="skel h24 w60"></div><div class="skel h14 w40 mt6"></div></div>
+      <div class="stat-card loading"><div class="skel h24 w60"></div><div class="skel h14 w40 mt6"></div></div>
+      <div class="stat-card loading"><div class="skel h24 w60"></div><div class="skel h14 w40 mt6"></div></div>
+      <div class="stat-card loading"><div class="skel h24 w60"></div><div class="skel h14 w40 mt6"></div></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card" id="dashSentCard">
+        <div class="card-head">
+          <h2 class="card-title">Market Sentiment</h2>
+          <span class="tip-badge" data-tip="Weighted sentiment score from the hottest Reddit posts across r/stocks, r/wallstreetbets, and r/investing.">What's this?</span>
+        </div>
+        <div id="dashSent"><div class="spin-wrap"><div class="spin"></div></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 class="card-title">Watchlist</h2>
+          <span style="font-size:12px; color:var(--muted)">Click any to open</span>
+        </div>
+        <div id="watchlist"><div class="spin-wrap"><div class="spin"></div></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2 class="card-title">Trending on Reddit</h2>
+        <span class="tip-badge" data-tip="Live feed of hot posts from r/stocks and r/wallstreetbets, color-coded by sentiment.">How it works</span>
+      </div>
+      <div id="trendingPosts"><div class="spin-wrap"><div class="spin"></div></div></div>
+    </div>
+  </div>
+
+  <!-- ── Stock Search ────────────────────────────────────────────────────── -->
+  <div id="view-search" class="view">
+    <div class="page-head">
+      <h1 class="page-title">Stock Search</h1>
+      <p class="page-sub">Search any US stock by ticker symbol or company name to see price history, key metrics, and Reddit sentiment.</p>
+    </div>
+    <div class="search-row">
+      <div class="input-wrap">
+        <svg viewBox="0 0 24 24" class="input-icon"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input id="stockInput" type="text" placeholder="Enter ticker, e.g. AAPL or Apple Inc." />
+      </div>
+      <button id="stockSearchBtn" class="btn-primary btn-lg">Search</button>
+    </div>
+    <div id="stockResult"></div>
+  </div>
+
+  <!-- ── Sectors ─────────────────────────────────────────────────────────── -->
+  <div id="view-sectors" class="view">
+    <div class="page-head">
+      <h1 class="page-title">Market Sectors</h1>
+      <p class="page-sub">Browse stocks by sector. Click a sector to expand and see live prices for top companies in that industry.</p>
+    </div>
+    <div id="sectorPerfRow" class="perf-row"><div class="spin-wrap inline"><div class="spin"></div></div></div>
+    <div id="sectorGrid" class="sector-grid"></div>
+  </div>
+
+  <!-- ── Reddit Feed ─────────────────────────────────────────────────────── -->
+  <div id="view-reddit" class="view">
+    <div class="page-head">
+      <h1 class="page-title">Reddit Sentiment Analyzer</h1>
+      <p class="page-sub">Type any ticker to instantly score how Reddit feels about it. We scan r/stocks, r/wallstreetbets, r/investing, and r/StockMarket and run NLP sentiment analysis on every post.</p>
+    </div>
+    <div class="search-row" style="margin-top:20px">
+      <div class="input-wrap">
+        <svg viewBox="0 0 24 24" class="input-icon"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+        <input id="redditInput" type="text" placeholder="Enter ticker, e.g. NVDA" />
+      </div>
+      <button id="redditBtn" class="btn-primary btn-lg">Analyze Sentiment</button>
+    </div>
+    <div class="reddit-hints">
+      <span style="font-size:12px; color:var(--muted)">Try:</span>
+      <button class="hint-chip" data-reddit="GME">GME</button>
+      <button class="hint-chip" data-reddit="NVDA">NVDA</button>
+      <button class="hint-chip" data-reddit="TSLA">TSLA</button>
+      <button class="hint-chip" data-reddit="AAPL">AAPL</button>
+    </div>
+    <div id="redditResult"></div>
+  </div>
+
+  <!-- ── Learn ───────────────────────────────────────────────────────────── -->
+  <div id="view-learn" class="view">
+    <div class="page-head">
+      <h1 class="page-title">Trading 101</h1>
+      <p class="page-sub">New to investing? These 12 concepts will give you the foundation to understand what you're looking at — and why it matters.</p>
+    </div>
+    <div id="learnGrid" class="learn-grid" style="margin-top:24px"></div>
+  </div>
+
+</main>
+
+<!-- Global tooltip -->
+<div id="globalTip" class="gtip hidden"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/charts.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:#060e1e; color:#ddeeff; font-family:'Inter',sans-serif; padding:20px; display:flex; flex-direction:column; gap:8px; }
+  .post { padding:12px 14px; border-radius:6px; background:#101e32; border:1px solid rgba(100,160,230,.1); border-left:3px solid transparent; text-decoration:none; display:block; }
+  .post.positive { border-left-color:#00c896; }
+  .post.negative { border-left-color:#ff4d6d; }
+  .post.neutral { border-left-color:#f5a623; }
+  .badge { display:inline-flex; align-items:center; font-size:10px; font-weight:700; padding:2px 7px; border-radius:20px; text-transform:uppercase; letter-spacing:.4px; }
+  .badge.positive { background:rgba(0,200,150,.12); color:#00c896; }
+  .badge.negative { background:rgba(255,77,109,.12); color:#ff4d6d; }
+  .badge.neutral { background:rgba(245,166,35,.12); color:#f5a623; }
+  .top { display:flex; gap:6px; align-items:center; margin-bottom:5px; }
+  .sub { font-size:11px; color:#5c7d9c; }
+  .title { font-size:13px; font-weight:500; color:#ddeeff; margin-bottom:5px; line-height:1.5; }
+  .meta { font-size:11.5px; color:#5c7d9c; display:flex; gap:12px; }
+</style>
+</head>
+<body>
+<a class="post positive" href="#">
+  <div class="top"><span class="badge positive">positive</span><span class="sub">r/stocks</span></div>
+  <div class="title">NVDA absolutely crushing it — Jensen's AI keynote was a masterclass, $1T+ market cap incoming</div>
+  <div class="meta"><span>↑ 4.2k</span><span>312 comments</span><span>2h ago</span></div>
+</a>
+<a class="post negative" href="#">
+  <div class="top"><span class="badge negative">negative</span><span class="sub">r/wallstreetbets</span></div>
+  <div class="title">My TSLA puts are printing. Elon tweeting at 3am again is not the leadership we need rn</div>
+  <div class="meta"><span>↑ 8.1k</span><span>741 comments</span><span>45m ago</span></div>
+</a>
+<a class="post neutral" href="#">
+  <div class="top"><span class="badge neutral">neutral</span><span class="sub">r/investing</span></div>
+  <div class="title">Apple earnings call tomorrow — expectations are moderate, analysts split on guidance</div>
+  <div class="meta"><span>↑ 893</span><span>67 comments</span><span>5h ago</span></div>
+</a>
+</body>
+</html>

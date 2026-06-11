@@ -1,0 +1,50 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:#060e1e; color:#ddeeff; font-family:'Inter',sans-serif; padding:24px; display:flex; align-items:center; justify-content:center; min-height:400px; }
+  .card { background:#101e32; border:1px solid rgba(100,160,230,.28); border-radius:20px; padding:36px; max-width:520px; width:100%; }
+  .logo { font-size:17px; font-weight:800; color:#00d4a8; margin-bottom:18px; }
+  .title { font-size:22px; font-weight:900; letter-spacing:-.4px; margin-bottom:8px; }
+  .sub { font-size:13.5px; color:#9ab4cc; line-height:1.7; margin-bottom:24px; }
+  .step { display:flex; gap:14px; padding:14px; background:#162540; border-radius:10px; border:1px solid rgba(100,160,230,.1); margin-bottom:12px; }
+  .num { width:26px; height:26px; border-radius:50%; background:rgba(0,212,168,.1); border:1.5px solid #00d4a8; color:#00d4a8; font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+  .step-title { font-size:14px; font-weight:700; margin-bottom:3px; display:flex; align-items:center; gap:8px; }
+  .step-desc { font-size:12.5px; color:#9ab4cc; line-height:1.6; }
+  .req { font-size:10px; font-weight:700; padding:2px 7px; border-radius:20px; background:rgba(255,77,109,.12); color:#ff4d6d; border:1px solid #ff4d6d; text-transform:uppercase; letter-spacing:.4px; }
+  .opt { font-size:10px; font-weight:700; padding:2px 7px; border-radius:20px; background:#1c2e4e; color:#5c7d9c; border:1px solid rgba(100,160,230,.1); text-transform:uppercase; letter-spacing:.4px; }
+  .actions { display:flex; gap:10px; align-items:center; margin-top:24px; }
+  .btn-primary { background:#00d4a8; color:#021912; border:none; border-radius:10px; padding:11px 22px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .btn-ghost { background:none; border:1px solid rgba(100,160,230,.16); color:#9ab4cc; border-radius:8px; padding:10px 16px; font-size:13.5px; font-weight:500; cursor:pointer; font-family:inherit; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">🫘 BeanStock</div>
+  <div class="title">Welcome! Let's get you set up.</div>
+  <div class="sub">BeanStock needs two free API keys to show live stock data and Reddit sentiment.</div>
+  <div class="step">
+    <div class="num">1</div>
+    <div>
+      <div class="step-title">Get a Finnhub API key <span class="req">Required</span></div>
+      <div class="step-desc">Powers all stock prices, charts, and metrics. Free tier: 60 calls/min.</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="num">2</div>
+    <div>
+      <div class="step-title">Create a Reddit app <span class="opt">Optional</span></div>
+      <div class="step-desc">Enables Reddit sentiment analysis across multiple subreddits.</div>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn-primary">I've added my keys — Reload</button>
+    <button class="btn-ghost">Skip for now</button>
+  </div>
+</div>
+</body>
+</html>

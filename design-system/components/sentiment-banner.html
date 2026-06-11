@@ -1,0 +1,49 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:#060e1e; color:#ddeeff; font-family:'Inter',sans-serif; padding:24px; }
+  .banner { background:#0b1628; border:1px solid rgba(100,160,230,.1); border-radius:14px; padding:24px; display:grid; grid-template-columns:auto 1fr auto; gap:24px; align-items:center; }
+  .ring { width:80px; height:80px; border-radius:50%; border:3px solid #00c896; color:#00c896; display:flex; flex-direction:column; align-items:center; justify-content:center; flex-shrink:0; }
+  .rv { font-size:22px; font-weight:900; letter-spacing:-1px; }
+  .rl { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; opacity:.8; }
+  .title { font-size:16px; font-weight:800; margin-bottom:12px; }
+  .bd-row { display:flex; align-items:center; gap:10px; margin-bottom:7px; }
+  .bd-lbl { font-size:12px; color:#9ab4cc; width:58px; }
+  .bd-bar { flex:1; height:6px; background:#101e32; border-radius:3px; overflow:hidden; }
+  .bd-fill { height:100%; border-radius:3px; }
+  .pos { background:#00c896; }
+  .neu { background:#f5a623; }
+  .neg { background:#ff4d6d; }
+  .bd-count { font-size:11px; color:#5c7d9c; width:22px; text-align:right; }
+  .kw-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:#5c7d9c; margin-bottom:7px; }
+  .kw-cloud { display:flex; flex-wrap:wrap; gap:5px; }
+  .kw-tag { padding:3px 9px; border-radius:20px; background:#101e32; border:1px solid rgba(100,160,230,.1); font-size:11.5px; color:#9ab4cc; }
+</style>
+</head>
+<body>
+<div class="banner">
+  <div class="ring"><span class="rv">+2.4</span><span class="rl">positive</span></div>
+  <div>
+    <div class="title">$NVDA on Reddit</div>
+    <div class="bd-row"><span class="bd-lbl">Positive</span><div class="bd-bar"><div class="bd-fill pos" style="width:68%"></div></div><span class="bd-count">17</span></div>
+    <div class="bd-row"><span class="bd-lbl">Neutral</span><div class="bd-bar"><div class="bd-fill neu" style="width:20%"></div></div><span class="bd-count">5</span></div>
+    <div class="bd-row"><span class="bd-lbl">Negative</span><div class="bd-bar"><div class="bd-fill neg" style="width:12%"></div></div><span class="bd-count">3</span></div>
+  </div>
+  <div>
+    <div class="kw-label">Top Keywords</div>
+    <div class="kw-cloud">
+      <span class="kw-tag">bullish</span>
+      <span class="kw-tag">AI</span>
+      <span class="kw-tag">breakout</span>
+      <span class="kw-tag">surge</span>
+      <span class="kw-tag">upgrade</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

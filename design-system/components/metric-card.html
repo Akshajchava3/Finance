@@ -1,0 +1,31 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:#060e1e; color:#ddeeff; font-family:'Inter',sans-serif; padding:0; }
+  .grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:1px; background:rgba(100,160,230,.1); }
+  .card { background:#0b1628; padding:16px 18px; }
+  .card:hover { background:#101e32; }
+  .lbl { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:#5c7d9c; margin-bottom:6px; display:flex; align-items:center; gap:4px; }
+  .dot { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%; background:#162540; color:#5c7d9c; font-size:9px; font-weight:700; border:1px solid rgba(100,160,230,.1); }
+  .val { font-size:19px; font-weight:800; letter-spacing:-.3px; }
+  .na { color:#5c7d9c; }
+</style>
+</head>
+<body>
+<div class="grid">
+  <div class="card"><div class="lbl">P/E Ratio <span class="dot">?</span></div><div class="val">28.4</div></div>
+  <div class="card"><div class="lbl">EPS <span class="dot">?</span></div><div class="val">$6.67</div></div>
+  <div class="card"><div class="lbl">Market Cap <span class="dot">?</span></div><div class="val">$3.28T</div></div>
+  <div class="card"><div class="lbl">52W High <span class="dot">?</span></div><div class="val">$237.23</div></div>
+  <div class="card"><div class="lbl">52W Low <span class="dot">?</span></div><div class="val">$164.08</div></div>
+  <div class="card"><div class="lbl">Beta <span class="dot">?</span></div><div class="val">1.24</div></div>
+  <div class="card"><div class="lbl">Dividend Yield <span class="dot">?</span></div><div class="val">0.44%</div></div>
+  <div class="card"><div class="lbl">ROE <span class="dot">?</span></div><div class="val">147.2%</div></div>
+</div>
+</body>
+</html>

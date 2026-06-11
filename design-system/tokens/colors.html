@@ -1,0 +1,46 @@
+<!-- @dsCard group="Tokens" -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:#060e1e; color:#ddeeff; font-family:'Inter',-apple-system,sans-serif; font-size:13px; padding:24px; }
+  h2 { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:#5c7d9c; margin-bottom:14px; margin-top:24px; }
+  h2:first-child { margin-top:0; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; }
+  .chip { border-radius:8px; width:80px; }
+  .swatch { height:48px; border-radius:6px 6px 0 0; border:1px solid rgba(255,255,255,.08); }
+  .chip-label { background:#0b1628; border:1px solid rgba(100,160,230,.1); border-top:none; border-radius:0 0 6px 6px; padding:5px 7px; }
+  .chip-name { font-size:11px; font-weight:600; color:#9ab4cc; }
+  .chip-hex { font-size:10px; color:#5c7d9c; margin-top:1px; font-family:monospace; }
+</style>
+</head>
+<body>
+<h2>Backgrounds</h2>
+<div class="row">
+  <div class="chip"><div class="swatch" style="background:#060e1e"></div><div class="chip-label"><div class="chip-name">bg</div><div class="chip-hex">#060e1e</div></div></div>
+  <div class="chip"><div class="swatch" style="background:#0b1628"></div><div class="chip-label"><div class="chip-name">s1</div><div class="chip-hex">#0b1628</div></div></div>
+  <div class="chip"><div class="swatch" style="background:#101e32"></div><div class="chip-label"><div class="chip-name">s2</div><div class="chip-hex">#101e32</div></div></div>
+  <div class="chip"><div class="swatch" style="background:#162540"></div><div class="chip-label"><div class="chip-name">s3</div><div class="chip-hex">#162540</div></div></div>
+  <div class="chip"><div class="swatch" style="background:#1c2e4e"></div><div class="chip-label"><div class="chip-name">s4</div><div class="chip-hex">#1c2e4e</div></div></div>
+</div>
+<h2>Brand</h2>
+<div class="row">
+  <div class="chip"><div class="swatch" style="background:#00d4a8"></div><div class="chip-label"><div class="chip-name">accent</div><div class="chip-hex">#00d4a8</div></div></div>
+  <div class="chip"><div class="swatch" style="background:rgba(0,212,168,.1)"></div><div class="chip-label"><div class="chip-name">accent-dim</div><div class="chip-hex">10% tint</div></div></div>
+</div>
+<h2>Status</h2>
+<div class="row">
+  <div class="chip"><div class="swatch" style="background:#00c896"></div><div class="chip-label"><div class="chip-name">green</div><div class="chip-hex">#00c896</div></div></div>
+  <div class="chip"><div class="swatch" style="background:#ff4d6d"></div><div class="chip-label"><div class="chip-name">red</div><div class="chip-hex">#ff4d6d</div></div></div>
+  <div class="chip"><div class="swatch" style="background:#f5a623"></div><div class="chip-label"><div class="chip-name">yellow</div><div class="chip-hex">#f5a623</div></div></div>
+</div>
+<h2>Text</h2>
+<div class="row">
+  <div class="chip"><div class="swatch" style="background:#ddeeff"></div><div class="chip-label"><div class="chip-name">text</div><div class="chip-hex">#ddeeff</div></div></div>
+  <div class="chip"><div class="swatch" style="background:#9ab4cc"></div><div class="chip-label"><div class="chip-name">text2</div><div class="chip-hex">#9ab4cc</div></div></div>
+  <div class="chip"><div class="swatch" style="background:#5c7d9c"></div><div class="chip-label"><div class="chip-name">muted</div><div class="chip-hex">#5c7d9c</div></div></div>
+</div>
+</body>
+</html>
