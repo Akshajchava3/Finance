@@ -14,7 +14,10 @@ const API = {
   getSectors:         ()      => API._get('/api/stocks/sectors'),
   getAnalyst:         (t)     => API._get(`/api/stocks/analyst/${t}`),
   getBatch:           (tickers) => API._get(`/api/stocks/batch?tickers=${encodeURIComponent(tickers)}`),
+  getIPOs:            ()        => API._get('/api/stocks/ipos'),
+  getPennyStocks:     (max)     => API._get(`/api/stocks/penny${max ? '?max=' + max : ''}`),
 
   getTickerSentiment: (t)     => API._get(`/api/sentiment/ticker/${t}`),
+  getPennySentiment:  (t)     => API._get(`/api/sentiment/penny/${t}`),
   getTrending:        ()      => API._get('/api/sentiment/trending'),
 };

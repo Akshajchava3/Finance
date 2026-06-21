@@ -1,8 +1,88 @@
+// ── Favorites / Pinned Tickers ────────────────────────────────────────────────
+
+function getFavorites() {
+  try { return JSON.parse(localStorage.getItem('bs_favorites') || '[]'); } catch { return []; }
+}
+function setFavorites(arr) { localStorage.setItem('bs_favorites', JSON.stringify(arr)); }
+function isFavorite(ticker) { return getFavorites().includes(ticker); }
+
+function toggleFavorite(ticker) {
+  const favs = getFavorites();
+  const idx  = favs.indexOf(ticker);
+  if (idx >= 0) favs.splice(idx, 1); else favs.push(ticker);
+  setFavorites(favs);
+
+  // Sync the star button in the stock view if it's showing
+  const btn = document.getElementById('favBtn-' + ticker);
+  if (btn) {
+    const pinned = isFavorite(ticker);
+    btn.classList.toggle('fav-active', pinned);
+    btn.title = pinned ? 'Remove from dashboard' : 'Pin to dashboard';
+    btn.innerHTML = `${pinned ? '★' : '☆'}<span class="fav-label">${pinned ? 'Pinned' : 'Pin'}</span>`;
+  }
+
+  // Refresh dashboard pins if currently visible
+  if (document.getElementById('view-dashboard')?.classList.contains('active')) loadPinned();
+}
+
+async function loadPinned() {
+  const favs = getFavorites();
+  const section = document.getElementById('pinsSection');
+  if (!favs.length) { section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+  const el = document.getElementById('pinsList');
+  el.innerHTML = spinner();
+  const results = await Promise.allSettled(favs.map(t => API.getQuote(t)));
+  el.innerHTML = favs.map((t, i) => {
+    if (results[i].status !== 'fulfilled') return `
+      <div class="pin-card err" onclick="loadStockView('${t}')">
+        <div class="pin-ticker">${t}</div>
+        <div class="pin-name" style="color:var(--red)">Load failed</div>
+        <button class="pin-remove" onclick="event.stopPropagation();toggleFavorite('${t}')">✕</button>
+      </div>`;
+    const q = results[i].value.quote;
+    const chg = q.dp ?? 0;
+    return `
+      <div class="pin-card" onclick="loadStockView('${t}')">
+        <div class="pin-card-top">
+          <span class="pin-ticker">${t}</span>
+          <button class="pin-remove" onclick="event.stopPropagation();toggleFavorite('${t}')" title="Unpin">✕</button>
+        </div>
+        <div class="pin-price">$${(q.c || 0).toFixed(2)}</div>
+        <div class="pin-chg ${chg >= 0 ? 'up' : 'down'}">${chg >= 0 ? '▲' : '▼'} ${Math.abs(chg).toFixed(2)}%</div>
+        <div class="pin-name">${tickerName(t)}</div>
+      </div>`;
+  }).join('');
+}
+
 // ── Bean Cursor ───────────────────────────────────────────────────────────────
 
 let beanCursorOn = false;
+let _beanCursorStyleEl = null;
+
+function _buildBeanCursorStyle() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 40;
+  const ctx = canvas.getContext('2d');
+  ctx.font = '32px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🫘', 20, 20);
+  const url = canvas.toDataURL();
+  const el = document.createElement('style');
+  el.id = 'beanCursorStyle';
+  el.textContent = `body.bean-cursor,body.bean-cursor *{cursor:url(${url}) 20 20,auto!important}`;
+  return el;
+}
+
 function toggleBeanCursor() {
   beanCursorOn = !beanCursorOn;
+  if (beanCursorOn) {
+    if (!_beanCursorStyleEl) _beanCursorStyleEl = _buildBeanCursorStyle();
+    if (!document.getElementById('beanCursorStyle')) document.head.appendChild(_beanCursorStyleEl);
+  } else {
+    document.getElementById('beanCursorStyle')?.remove();
+  }
   document.body.classList.toggle('bean-cursor', beanCursorOn);
   const btn = document.getElementById('beanCursorBtn');
   btn.classList.toggle('active', beanCursorOn);
@@ -24,15 +104,17 @@ function dismissIntro() {
 // ── Tutorial System ───────────────────────────────────────────────────────────
 
 const TUT_STEPS = [
-  { sel: '.sidebar',           title: '🧭 Navigation',        body: 'This sidebar is your main menu. Click any button to switch between pages — Dashboard, Stock Search, Underdogs, Sectors, Reddit Feed, and Trading 101.',  view: null,        pos: 'right'  },
-  { sel: '.hero-section',      title: '🔍 Quick Search',       body: 'Type any stock ticker here — like AAPL, NVDA, or TSLA — to instantly pull up a full analysis with price charts, metrics, and sentiment.',            view: 'dashboard', pos: 'bottom' },
-  { sel: '#dashSentCard',      title: '📊 Market Sentiment',   body: 'This card tells you how Reddit, StockTwits, and financial news feel about the overall market right now. It includes a plain-English buy/hold/caution verdict.',   view: 'dashboard', pos: 'right'  },
-  { sel: '[data-view="search"]',     title: '🔎 Stock Search',  body: 'Deep-dive into any stock: live price chart, analyst ratings, key metrics (P/E, EPS, Beta), and multi-source sentiment analysis.',               view: null,        pos: 'right'  },
-  { sel: '[data-view="underdogs"]',  title: '🌱 Underdogs',     body: 'BeanStock\'s signature feature. Stocks with strong fundamentals — low P/E, positive EPS, near yearly lows — that social media is sleeping on.',  view: null,        pos: 'right'  },
-  { sel: '[data-view="sectors"]',    title: '🗂️ Sectors',       body: 'Browse all 8 major market sectors. Click one to expand it and see live prices for the top companies in that industry.',                            view: null,        pos: 'right'  },
-  { sel: '[data-view="reddit"]',     title: '📡 Reddit Feed',   body: 'Enter any ticker to run NLP sentiment scoring across 4 major investing subreddits. Includes a full breakdown and per-source analysis.',           view: null,        pos: 'right'  },
-  { sel: '[data-view="learn"]',      title: '📚 Trading 101',   body: 'New to stocks? This section breaks down every concept — P/E ratios, Beta, dividends, dollar-cost averaging — in plain English with examples.',    view: null,        pos: 'right'  },
-  { sel: '#beanCursorBtn',           title: '🫘 Bean Mode',      body: 'One last thing — click this button in the top-right to turn your cursor into a bean. Clearly the most important feature in BeanStock.',           view: null,        pos: 'bottom' },
+  { sel: '.sidebar',                title: '🧭 Navigation',      body: 'This sidebar is your main menu. Click any button to switch pages — Dashboard, Search, Underdogs, Sectors, IPO Calendar, Reddit, and Trading 101.',          view: null,        pos: 'right'  },
+  { sel: '.hero-section',           title: '🔍 Quick Search',     body: 'Type any ticker — AAPL, NVDA, TSLA — to instantly pull up a live price chart, key metrics, analyst ratings, and multi-source sentiment.',                  view: 'dashboard', pos: 'bottom' },
+  { sel: '#dashSentCard',           title: '📊 Market Sentiment', body: 'Aggregated sentiment from Reddit, StockTwits, and financial news. Includes a plain-English verdict: Bullish, Bearish, or Neutral — with action guidance.', view: 'dashboard', pos: 'right'  },
+  { sel: '[data-view="search"]',    title: '🔎 Stock Search',     body: 'Deep-dive any US stock: live chart, P/E, EPS, Beta, 52W range, analyst consensus, and three-source sentiment. Hit ★ to pin it to your dashboard.',       view: null,        pos: 'right'  },
+  { sel: '[data-view="underdogs"]', title: '🌱 Underdogs',        body: 'BeanStock\'s signature feature. Stocks with low media/analyst attention but strong algorithmic quality — profitable, undervalued, technically showing upside the crowd hasn\'t priced in yet.',    view: null,        pos: 'right'  },
+  { sel: '[data-view="sectors"]',   title: '🗂️ Sectors',          body: 'All 8 market sectors with live prices for every stock. A performance bar at the top ranks sectors best to worst. Click any row to open that stock\'s full analysis.',  view: null,        pos: 'right'  },
+  { sel: '[data-view="ipos"]',      title: '🚀 IPO Calendar',     body: 'Track companies going public — upcoming, priced, filed, and withdrawn. Includes a plain-English explainer of what IPOs are and how to evaluate them.',     view: null,        pos: 'right'  },
+  { sel: '[data-view="reddit"]',    title: '📡 Reddit Feed',      body: 'Enter any ticker to score how Reddit feels about it right now. We scan r/stocks, r/wallstreetbets, r/investing, and r/StockMarket with NLP.',             view: null,        pos: 'right'  },
+  { sel: '[data-view="learn"]',     title: '📚 Trading 101',      body: 'New to stocks? This section explains every concept — P/E ratios, Beta, dividends, DCA — in plain English with real examples you can relate to.',          view: null,        pos: 'right'  },
+  { sel: '[data-view="connect"]',   title: '🔌 Connect',           body: 'Link BeanStock to any trading platform. Add the one-click bookmarklet to your browser and get instant Buy/Hold/Sell analysis on any stock you\'re viewing — without leaving the site.',    view: null,        pos: 'right'  },
+  { sel: '#beanCursorBtn',          title: '🫘 Bean Mode',         body: 'Finally — click this button to turn your cursor into a realistic bean. The most important feature in BeanStock. Clearly.',                                view: null,        pos: 'bottom' },
 ];
 
 let tutStep = 0;
@@ -63,6 +145,20 @@ function showTutStep(idx) {
 }
 
 function positionTutStep(step, idx) {
+  const bubble = document.getElementById('tutBubble');
+
+  // Fade content out → swap text → fade back in
+  bubble.classList.add('tut-fading');
+  setTimeout(() => {
+    document.getElementById('tutTitle').textContent   = step.title;
+    document.getElementById('tutBody').textContent    = step.body;
+    document.getElementById('tutCounter').textContent = `${idx + 1} / ${TUT_STEPS.length}`;
+    document.getElementById('tutNextBtn').textContent = idx === TUT_STEPS.length - 1 ? '🎉 Done!' : 'Next →';
+    document.querySelectorAll('.tut-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+    bubble.classList.remove('tut-fading');
+  }, 140);
+
+  // Highlight target element
   const target = document.querySelector(step.sel);
   if (target) {
     tutHighlightEl = target;
@@ -70,18 +166,12 @@ function positionTutStep(step, idx) {
     target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  document.getElementById('tutTitle').textContent = step.title;
-  document.getElementById('tutBody').textContent  = step.body;
-  document.getElementById('tutCounter').textContent = `${idx + 1} / ${TUT_STEPS.length}`;
-  document.getElementById('tutNextBtn').textContent = idx === TUT_STEPS.length - 1 ? '🎉 Done!' : 'Next →';
-  document.querySelectorAll('.tut-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
-
   if (!target) return;
   setTimeout(() => {
     const rect = target.getBoundingClientRect();
-    const bw = 300, bh = 200;
+    const bw = 300, bh = 230;
     let top, left;
-    if (step.pos === 'right')  { top = rect.top + rect.height / 2 - bh / 2; left = rect.right + 20; }
+    if (step.pos === 'right')       { top = rect.top + rect.height / 2 - bh / 2; left = rect.right + 20; }
     else if (step.pos === 'left')   { top = rect.top + rect.height / 2 - bh / 2; left = rect.left - bw - 20; }
     else if (step.pos === 'bottom') { top = rect.bottom + 16; left = rect.left + rect.width / 2 - bw / 2; }
     else                            { top = rect.top - bh - 16; left = rect.left + rect.width / 2 - bw / 2; }
@@ -89,7 +179,10 @@ function positionTutStep(step, idx) {
     left = Math.max(16, Math.min(left, window.innerWidth  - bw - 16));
     top  = Math.max(80, Math.min(top,  window.innerHeight - bh - 16));
 
-    document.getElementById('tutBubble').style.cssText = `top:${top}px;left:${left}px;transform:none`;
+    // Set properties individually — preserves the CSS transition on top/left
+    bubble.style.top       = top  + 'px';
+    bubble.style.left      = left + 'px';
+    bubble.style.transform = 'none';
   }, 60);
 }
 
@@ -128,14 +221,39 @@ function showView(name) {
   NAV_BTNS.forEach(b => b.classList.toggle('active', b.dataset.view === name));
 }
 
+// Per-view reload cooldowns (ms). Infinity = load once per session.
+const _viewCooldowns = {
+  dashboard:   15000,   // live market data — refresh every 15s minimum
+  sectors:     30000,   // lots of price calls — 30s cooldown
+  underdogs:   300000,  // very expensive — 5-minute cooldown
+  ipos:        120000,  // calendar doesn't change often
+  pennystocks: 120000,
+  reddit:      60000,
+  learn:       Infinity,
+  connect:     Infinity,
+};
+const _viewLastLoad = {};
+
+function shouldReloadView(v) {
+  const cd = _viewCooldowns[v] ?? 30000;
+  if (cd === Infinity) return !_viewLastLoad[v];
+  return !_viewLastLoad[v] || (Date.now() - _viewLastLoad[v] > cd);
+}
+function markViewLoaded(v) { _viewLastLoad[v] = Date.now(); }
+
 NAV_BTNS.forEach(btn => {
   btn.addEventListener('click', () => {
     const v = btn.dataset.view;
     showView(v);
-    if (v === 'dashboard') loadDashboard();
-    if (v === 'sectors')   loadSectors();
-    if (v === 'underdogs') loadUnderdogs();
-    if (v === 'learn')     loadLearn();
+    if (!shouldReloadView(v)) return;
+    markViewLoaded(v);
+    if (v === 'dashboard')   loadDashboard();
+    if (v === 'sectors')     loadSectors();
+    if (v === 'underdogs')   loadUnderdogs();
+    if (v === 'ipos')        loadIPOs();
+    if (v === 'learn')       loadLearn();
+    if (v === 'pennystocks') loadPennyStocks();
+    if (v === 'connect')     loadConnect();
   });
 });
 
@@ -146,19 +264,73 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ── Market Status ─────────────────────────────────────────────────────────────
+// ── Wall Street Clock ─────────────────────────────────────────────────────────
 
-function updateMarketPill() {
-  const el = document.getElementById('marketPill');
-  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const h = et.getHours() + et.getMinutes() / 60;
-  const day = et.getDay();
-  const open = day >= 1 && day <= 5 && h >= 9.5 && h < 16;
-  el.textContent    = open ? '⬤ Market Open' : '○ Market Closed';
-  el.style.color    = open ? 'var(--green)' : 'var(--muted)';
-  el.style.borderColor = open ? 'var(--green)' : 'var(--border)';
+function fmtCountdown(ms) {
+  if (ms <= 0) return '0s';
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
 }
-updateMarketPill();
+
+function updateWsClock() {
+  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const h = et.getHours(), m = et.getMinutes(), s = et.getSeconds(), day = et.getDay();
+  const totalMins = h * 60 + m;
+
+  // Time display
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12  = h % 12 || 12;
+  document.getElementById('wsTime').textContent =
+    `${h12}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')} ${ampm} ET`;
+
+  let session, dotClass, countdown;
+  const isWeekday = day >= 1 && day <= 5;
+
+  if (!isWeekday) {
+    session  = 'Weekend — Closed';
+    dotClass = 'dot-closed';
+    const next = new Date(et); next.setDate(next.getDate() + (day === 6 ? 2 : 1)); next.setHours(9,30,0,0);
+    countdown = 'Opens ' + fmtCountdown(next - et);
+  } else if (totalMins < 4 * 60) {
+    session  = 'Overnight — Closed';
+    dotClass = 'dot-closed';
+    const next = new Date(et); next.setHours(4,0,0,0);
+    countdown = 'Pre-market in ' + fmtCountdown(next - et);
+  } else if (totalMins < 9 * 60 + 30) {
+    session  = 'Pre-Market';
+    dotClass = 'dot-pre';
+    const next = new Date(et); next.setHours(9,30,0,0);
+    countdown = 'Opens in ' + fmtCountdown(next - et);
+  } else if (totalMins < 16 * 60) {
+    session  = 'Market Open';
+    dotClass = 'dot-open';
+    const next = new Date(et); next.setHours(16,0,0,0);
+    countdown = 'Closes in ' + fmtCountdown(next - et);
+  } else if (totalMins < 20 * 60) {
+    session  = 'After-Hours';
+    dotClass = 'dot-after';
+    const next = new Date(et); next.setHours(20,0,0,0);
+    countdown = 'AH closes in ' + fmtCountdown(next - et);
+  } else {
+    session  = 'Overnight — Closed';
+    dotClass = 'dot-closed';
+    const next = new Date(et);
+    next.setDate(next.getDate() + (day === 5 ? 3 : 1)); next.setHours(4,0,0,0);
+    countdown = 'Pre-market in ' + fmtCountdown(next - et);
+  }
+
+  document.getElementById('wsLabel').textContent  = session;
+  document.getElementById('wsDot').className      = 'ws-dot ' + dotClass;
+  document.getElementById('wsCountdown').textContent = countdown;
+}
+
+updateWsClock();
+setInterval(updateWsClock, 1000);
 
 // ── Global Search ─────────────────────────────────────────────────────────────
 
@@ -184,7 +356,6 @@ globalSearch.addEventListener('input', () => {
         el.addEventListener('click', () => {
           searchDrop.classList.add('hidden');
           globalSearch.value = '';
-          showView('search');
           loadStockView(el.dataset.ticker);
         });
       });
@@ -209,6 +380,7 @@ const WATCHLIST = ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'AMZN', 'GOOGL'];
 
 function loadDashboard() {
   loadIndexStats();
+  loadPinned();
   loadWatchlist();
   loadTrending();
   loadDashSentiment();
@@ -217,12 +389,17 @@ function loadDashboard() {
 async function loadIndexStats() {
   const row = document.getElementById('statsRow');
   try {
-    const quotes = await Promise.all(INDICES.map(i => API.getQuote(i.ticker)));
+    const results = await Promise.allSettled(INDICES.map(i => API.getQuote(i.ticker)));
     row.innerHTML = INDICES.map((idx, i) => {
-      const q = quotes[i].quote;
+      if (results[i].status !== 'fulfilled') return `
+        <div class="stat-card">
+          <div class="stat-label">${idx.label}</div>
+          <div class="stat-value" style="color:var(--muted)">—</div>
+        </div>`;
+      const q = results[i].value.quote;
       const chg = q.dp ?? 0;
       return `
-        <div class="stat-card" onclick="showView('search'); loadStockView('${idx.ticker}')" style="cursor:pointer">
+        <div class="stat-card" onclick="loadStockView('${idx.ticker}')" style="cursor:pointer">
           <div class="stat-label">${idx.label}</div>
           <div class="stat-value">$${(q.c || 0).toFixed(2)}</div>
           <div class="stat-change ${chg >= 0 ? 'up' : 'down'}">${chg >= 0 ? '▲' : '▼'} ${Math.abs(chg).toFixed(2)}%</div>
@@ -235,12 +412,26 @@ async function loadWatchlist() {
   const el = document.getElementById('watchlist');
   el.innerHTML = spinner();
   try {
-    const quotes = await Promise.all(WATCHLIST.map(t => API.getQuote(t)));
+    const results = await Promise.allSettled(WATCHLIST.map(t => API.getQuote(t)));
+    const anyLoaded = results.some(r => r.status === 'fulfilled');
+    if (!anyLoaded) {
+      const err = results[0].reason?.message || 'Could not load prices';
+      el.innerHTML = errState(err.includes('key') ? 'Add FINNHUB_API_KEY to .env' : err, 'showOnboarding()');
+      return;
+    }
     el.innerHTML = WATCHLIST.map((t, i) => {
-      const q = quotes[i].quote;
+      if (results[i].status !== 'fulfilled') return `
+        <div class="wl-row">
+          <span class="wl-sym">${t}</span>
+          <span class="wl-name">${tickerName(t)}</span>
+          <span class="wl-price" style="color:var(--muted)">—</span>
+          <span class="wl-chg" style="color:var(--muted)">—</span>
+          <span class="wl-sent" id="wls-${t}"></span>
+        </div>`;
+      const q = results[i].value.quote;
       const chg = q.dp ?? 0;
       return `
-        <div class="wl-row" onclick="showView('search'); loadStockView('${t}')">
+        <div class="wl-row" onclick="loadStockView('${t}')">
           <span class="wl-sym">${t}</span>
           <span class="wl-name">${tickerName(t)}</span>
           <span class="wl-price">$${(q.c || 0).toFixed(2)}</span>
@@ -345,13 +536,13 @@ function barRow(label, n, total, cls) {
 
 document.getElementById('heroSearchBtn').addEventListener('click', () => {
   const v = document.getElementById('heroSearch').value.trim().toUpperCase();
-  if (v) { showView('search'); loadStockView(v); }
+  if (v) { loadStockView(v); }
 });
 document.getElementById('heroSearch').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('heroSearchBtn').click();
 });
 document.querySelectorAll('.hint-chip[data-ticker]').forEach(chip => {
-  chip.addEventListener('click', () => { showView('search'); loadStockView(chip.dataset.ticker); });
+  chip.addEventListener('click', () => { loadStockView(chip.dataset.ticker); });
 });
 document.querySelectorAll('.hint-chip[data-reddit]').forEach(chip => {
   chip.addEventListener('click', () => {
@@ -362,32 +553,118 @@ document.querySelectorAll('.hint-chip[data-reddit]').forEach(chip => {
 
 // ── Stock View ────────────────────────────────────────────────────────────────
 
+let _activeTicker = null;
+
+// ── Stock Drawer ──────────────────────────────────────────────────────────────
+
+function openStockDrawer(title) {
+  const drawer   = document.getElementById('stockDrawer');
+  const backdrop = document.getElementById('stockDrawerBackdrop');
+  document.getElementById('stockDrawerTitle').textContent = title || 'Loading…';
+  const btn = document.getElementById('drawerFsBtn');
+
+  // Quick mode (companion window): open fullscreen immediately, no backdrop
+  if (document.body.classList.contains('quick-mode')) {
+    drawer.classList.remove('hidden');
+    drawer.classList.add('open', 'fullscreen');
+    backdrop.classList.add('hidden');
+    if (btn) { btn.textContent = '⤡'; btn.title = 'Exit fullscreen'; }
+    document.body.style.overflow = 'hidden';
+    return;
+  }
+
+  // Normal mode: reset fullscreen from any previous stock, then animate in
+  drawer.classList.remove('fullscreen');
+  backdrop.style.opacity = '';
+  backdrop.style.pointerEvents = '';
+  if (btn) { btn.textContent = '⤢'; btn.title = 'Fullscreen'; }
+  backdrop.classList.remove('hidden');
+  drawer.classList.remove('hidden');
+  requestAnimationFrame(() => {
+    backdrop.classList.add('open');
+    drawer.classList.add('open');
+  });
+  document.body.style.overflow = 'hidden';
+}
+
+function toggleDrawerFullscreen() {
+  const drawer   = document.getElementById('stockDrawer');
+  const backdrop = document.getElementById('stockDrawerBackdrop');
+  const btn      = document.getElementById('drawerFsBtn');
+  const isFs     = drawer.classList.toggle('fullscreen');
+  if (btn) {
+    btn.textContent = isFs ? '⤡' : '⤢';
+    btn.title       = isFs ? 'Exit fullscreen' : 'Fullscreen';
+  }
+  // Backdrop is unnecessary when the drawer already covers the full viewport
+  backdrop.style.opacity = isFs ? '0' : '';
+  backdrop.style.pointerEvents = isFs ? 'none' : '';
+}
+
+function closeStockDrawer() {
+  const drawer   = document.getElementById('stockDrawer');
+  const backdrop = document.getElementById('stockDrawerBackdrop');
+  drawer.classList.remove('open', 'fullscreen');
+  backdrop.classList.remove('open');
+  backdrop.style.opacity = '';
+  backdrop.style.pointerEvents = '';
+  const btn = document.getElementById('drawerFsBtn');
+  if (btn) { btn.textContent = '⤢'; btn.title = 'Fullscreen'; }
+  _activeTicker = null;
+  setTimeout(() => {
+    drawer.classList.add('hidden');
+    backdrop.classList.add('hidden');
+    document.getElementById('stockDrawerBody').innerHTML = '';
+  }, 280);
+  document.body.style.overflow = '';
+}
+
 async function loadStockView(ticker) {
-  const el = document.getElementById('stockResult');
   ticker = ticker.toUpperCase().trim();
+  if (!ticker) return;
+  _activeTicker = ticker;
+  _lastSentimentScore = 0;
+  openStockDrawer(ticker);
+  const el = document.getElementById('stockDrawerBody');
   el.innerHTML = `<div style="padding:40px">${spinner()}</div>`;
 
   try {
-    const [{ quote, profile }, metrics, news, analystData] = await Promise.all([
+    const [quoteR, metricsR, newsR, analystR] = await Promise.allSettled([
       API.getQuote(ticker),
       API.getMetrics(ticker),
       API.getNews(ticker),
-      API.getAnalyst(ticker).catch(() => null),
+      API.getAnalyst(ticker),
     ]);
+    if (ticker !== _activeTicker) return; // a newer search superseded this one — discard stale result
+
+    // Quote is the only hard requirement — everything else degrades gracefully
+    if (quoteR.status !== 'fulfilled') {
+      throw new Error(quoteR.reason?.message || 'Could not fetch price data');
+    }
+    const { quote, profile } = quoteR.value;
+    const metrics    = metricsR.status    === 'fulfilled' ? metricsR.value    : {};
+    const news       = newsR.status       === 'fulfilled' ? newsR.value       : [];
+    const analystData = analystR.status   === 'fulfilled' ? analystR.value    : null;
+
+    // Update drawer title to the real company name
+    const titleEl = document.getElementById('stockDrawerTitle');
+    if (titleEl) titleEl.textContent = `${profile?.name || ticker} (${ticker})`;
 
     const q = quote;
     const m = metrics.metric || {};
     const chg = q.dp ?? 0;
     const price = q.c || 0;
 
+    const prof   = profile || {};
+    const pinned = isFavorite(ticker);
     el.innerHTML = `
       <div class="stock-hero">
-        ${profile.logo
-          ? `<img class="stock-logo" src="${esc(profile.logo)}" alt="${ticker}" onerror="this.outerHTML='<div class=stock-ph>${ticker[0]}</div>'">`
+        ${prof.logo
+          ? `<img class="stock-logo" src="${esc(prof.logo)}" alt="${ticker}" onerror="this.outerHTML='<div class=stock-ph>${ticker[0]}</div>'">`
           : `<div class="stock-ph">${ticker[0]}</div>`}
         <div style="flex:1;min-width:0">
-          <div class="sh-name">${esc(profile.name || ticker)}</div>
-          <div class="sh-sub">${ticker}${profile.exchange ? ' · ' + profile.exchange : ''}${profile.finnhubIndustry ? ' · ' + profile.finnhubIndustry : ''}</div>
+          <div class="sh-name">${esc(prof.name || ticker)}</div>
+          <div class="sh-sub">${ticker}${prof.exchange ? ' · ' + prof.exchange : ''}${prof.finnhubIndustry ? ' · ' + prof.finnhubIndustry : ''}</div>
           <div class="sh-price">$${price.toFixed(2)}</div>
           <div class="sh-change ${chg >= 0 ? 'up' : 'down'}">${chg >= 0 ? '▲' : '▼'} ${Math.abs(chg).toFixed(2)}% today</div>
           <div class="sh-ohlc">
@@ -397,14 +674,29 @@ async function loadStockView(ticker) {
             <span>Prev Close <strong>$${(q.pc||0).toFixed(2)}</strong></span>
           </div>
         </div>
+        <button class="fav-btn ${pinned ? 'fav-active' : ''}"
+                id="favBtn-${ticker}"
+                onclick="toggleFavorite('${ticker}')"
+                title="${pinned ? 'Remove from dashboard' : 'Pin to dashboard'}">
+          ${pinned ? '★' : '☆'}<span class="fav-label">${pinned ? 'Pinned' : 'Pin'}</span>
+        </button>
       </div>
 
       <div class="chart-card">
-        <div class="range-row" id="rangeRow">
-          <button class="range-btn active" data-range="1W">1W</button>
-          <button class="range-btn" data-range="1M">1M</button>
-          <button class="range-btn" data-range="3M">3M</button>
-          <button class="range-btn" data-range="1Y">1Y</button>
+        <div class="chart-toolbar">
+          <div class="range-row" id="rangeRow">
+            <button class="range-btn active" data-range="1D">D</button>
+            <button class="range-btn" data-range="1W">W</button>
+            <button class="range-btn" data-range="1M">M</button>
+            <button class="range-btn" data-range="1Y">Y</button>
+            <button class="range-btn" data-range="ALL">All</button>
+          </div>
+          <div class="mode-row" id="modeRow">
+            <button class="mode-btn active" data-mode="line"      title="Line Chart">📈</button>
+            <button class="mode-btn"        data-mode="candle"    title="Candlestick">🕯️</button>
+            <button class="mode-btn"        data-mode="analysis"  title="Technical Analysis">📊</button>
+            <button class="mode-btn"        data-mode="sentiment" title="Sentiment Forecast">🔮</button>
+          </div>
         </div>
         <div class="canvas-wrap"><canvas id="priceChart"></canvas></div>
       </div>
@@ -417,7 +709,7 @@ async function loadStockView(ticker) {
         <div class="metrics-grid">
           ${mCard('P/E Ratio',      fmtVal(m.peNormalizedAnnual),                  'Price ÷ Earnings. Lower can mean undervalued. S&P 500 avg is ~20–25.')}
           ${mCard('EPS',            fmtVal(m.epsNormalizedAnnual, '$'),             'Earnings Per Share — profit divided by shares. Higher = more earning power.')}
-          ${mCard('Market Cap',     fmtBig((profile.marketCapitalization||0)*1e6),  'Total company value. Large-cap >$10B = more stable.')}
+          ${mCard('Market Cap',     fmtBig((prof.marketCapitalization||0)*1e6),  'Total company value. Large-cap >$10B = more stable.')}
           ${mCard('52W High',       fmtVal(m['52WeekHigh'], '$'),                  'Highest price in the last year. Near this = strong momentum or resistance.')}
           ${mCard('52W Low',        fmtVal(m['52WeekLow'],  '$'),                  'Lowest price in the last year. Near this = weakness or potential opportunity.')}
           ${mCard('Beta',           fmtVal(m.beta),                                'Volatility vs the market. >1 = more volatile than S&P 500.')}
@@ -426,12 +718,20 @@ async function loadStockView(ticker) {
         </div>
       </div>
 
+      <div class="metrics-section">
+        <div class="section-head">
+          <span class="section-title">Recommendation — ${ticker}</span>
+          <span class="tip-badge" data-tip="Blends technical signals (EMA crossover, Bollinger position, support/resistance), the sentiment forecast, and analyst consensus into one actionable verdict. Not financial advice.">How is this built?</span>
+        </div>
+        <div id="stockRec" style="padding:16px">${spinner()}</div>
+      </div>
+
       ${analystData?.recommendations ? analystSection(analystData.recommendations, analystData.peers) : ''}
 
       <div class="metrics-section">
         <div class="section-head">
           <span class="section-title">Market Sentiment — $${ticker}</span>
-          <span class="tip-badge" data-tip="Weighted score: Reddit 35%, StockTwits 40%, News 25%.">How is this scored?</span>
+          <span class="tip-badge" data-tip="Weighted: Reddit 22%, StockTwits 28%, News 16%, WSJ 12%, Seeking Alpha 13%, Forums 9%.">How is this scored?</span>
         </div>
         <div id="stockSent" style="padding:16px">${spinner()}</div>
       </div>
@@ -452,41 +752,209 @@ async function loadStockView(ticker) {
         </div>` : ''}
     `;
 
-    loadCandles(ticker, '1W');
+    _chartMode = 'line';
+    _chartRange = '1D';
+    loadCandles(ticker, '1D', 'line');
+
     document.getElementById('rangeRow').addEventListener('click', e => {
       const btn = e.target.closest('.range-btn');
       if (!btn) return;
       document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      loadCandles(ticker, btn.dataset.range);
+      _chartRange = btn.dataset.range;
+      loadCandles(ticker, _chartRange, _chartMode);
+    });
+
+    document.getElementById('modeRow').addEventListener('click', e => {
+      const btn = e.target.closest('.mode-btn');
+      if (!btn) return;
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _chartMode = btn.dataset.mode;
+      loadCandles(ticker, _chartRange, _chartMode);
     });
 
     loadStockSentiment(ticker);
+    loadRecommendation(ticker, analystData);
   } catch (e) {
+    if (ticker !== _activeTicker) return;
     el.innerHTML = `<div style="padding:32px">${errState('Could not load ' + ticker + ' — ' + e.message)}</div>`;
   }
 }
 
-async function loadCandles(ticker, range) {
-  try { renderPriceChart('priceChart', await API.getCandles(ticker, range), range); } catch {}
+let _chartMode  = 'line';
+let _chartRange = '1D';
+let _lastSentimentScore = 0;
+
+async function loadCandles(ticker, range, mode) {
+  if (ticker !== _activeTicker) return;
+  const wrap = document.querySelector('.canvas-wrap');
+  if (wrap && !document.getElementById('priceChart')) {
+    wrap.innerHTML = '<canvas id="priceChart"></canvas>';
+  }
+  try {
+    const data = await API.getCandles(ticker, range);
+    if (ticker !== _activeTicker) return;
+    renderPriceChart('priceChart', data, range, mode || _chartMode, _lastSentimentScore);
+  } catch {}
 }
 
 async function loadStockSentiment(ticker) {
+  if (ticker !== _activeTicker) return;
   const el = document.getElementById('stockSent');
   if (!el) return;
   try {
     const d = await API.getTickerSentiment(ticker);
+    if (ticker !== _activeTicker) return;
+    _lastSentimentScore = d.score ?? 0;
     el.innerHTML = sentimentBlock(d, 5);
+    // If sentiment mode is active, re-render chart with score
+    if (_chartMode === 'sentiment') loadCandles(ticker, _chartRange, 'sentiment');
+    // Refresh the recommendation card now that a real sentiment score is in
+    if (_recCache.ticker === ticker) {
+      renderRecommendationCard(ticker, _recCache.data, _lastSentimentScore, _recCache.analystData);
+    }
   } catch (e) {
+    if (ticker !== _activeTicker) return;
     el.innerHTML = `<div style="padding:16px">${errState(e.message)}</div>`;
   }
+}
+
+// ── Recommendation (technicals + sentiment forecast + analyst consensus) ──────
+
+let _recCache = { ticker: null, data: null, analystData: null };
+
+async function loadRecommendation(ticker, analystData) {
+  if (ticker !== _activeTicker) return;
+  const el = document.getElementById('stockRec');
+  if (!el) return;
+  try {
+    // Use a stable weekly dataset (1Y) for technicals — independent of whichever
+    // range/mode the user currently has the chart set to, and long enough for
+    // EMA9/EMA21 to have a prior value to detect a crossover against.
+    const data = await API.getCandles(ticker, '1Y');
+    if (ticker !== _activeTicker) return;
+    if (!data || data.s !== 'ok' || !data.c?.length) {
+      el.innerHTML = `<div class="empty-state"><div class="es-icon">🤷</div><div class="es-title">Not enough price history</div></div>`;
+      return;
+    }
+    _recCache = { ticker, data, analystData };
+    renderRecommendationCard(ticker, data, _lastSentimentScore, analystData);
+  } catch (e) {
+    if (ticker !== _activeTicker) return;
+    el.innerHTML = `<div style="padding:16px">${errState(e.message)}</div>`;
+  }
+}
+
+function renderRecommendationCard(ticker, data, sentScore, analystData) {
+  if (ticker !== _activeTicker) return;
+  const el = document.getElementById('stockRec');
+  if (!el) return;
+
+  const rec = buildRecommendation(data, sentScore, analystData?.recommendations);
+
+  el.innerHTML = `
+    <div class="rec-card" style="border-color:${rec.color}40">
+      <div class="rec-head">
+        <span class="rec-icon">${rec.icon}</span>
+        <div>
+          <div class="rec-verdict" style="color:${rec.color}">${rec.verdict}</div>
+          <div class="rec-conf">${rec.confidence}</div>
+        </div>
+      </div>
+      <p class="rec-advice">${rec.advice}</p>
+      <div class="rec-grid">
+        <div class="rec-factor">
+          <span class="rec-flabel">Technical</span>
+          <span class="rec-fval">${rec.technical.signal}</span>
+        </div>
+        <div class="rec-factor">
+          <span class="rec-flabel">Sentiment Forecast</span>
+          <span class="rec-fval">${rec.sentiment.text}</span>
+        </div>
+        ${rec.analyst ? `
+        <div class="rec-factor">
+          <span class="rec-flabel">Analyst Consensus</span>
+          <span class="rec-fval">${rec.analyst.label}</span>
+        </div>` : ''}
+      </div>
+      <div class="rec-levels">
+        <span class="rec-level buy-zone">📥 Buy near <strong>$${rec.technical.support.toFixed(2)}</strong> (support)</span>
+        <span class="rec-level sell-zone">📤 Trim/sell near <strong>$${rec.technical.resistance.toFixed(2)}</strong> (resistance)</span>
+      </div>
+      <div class="rec-disclaimer">Generated from EMA/Bollinger technicals, compiled sentiment, and analyst data. Not financial advice.</div>
+    </div>`;
+}
+
+// ── Super Bean Mode ───────────────────────────────────────────────────────────
+
+let _sbActive   = false;
+let _sbInterval = null;
+let _sbBeans    = [];
+let _sbIconsSwapped = false;
+
+function activateSuperBean() {
+  if (_sbActive) return;
+  _sbActive = true;
+  document.getElementById('sbStopBtn').classList.remove('hidden');
+
+  const endTime = Date.now() + 5000;
+
+  function spawnBean() {
+    if (Date.now() > endTime) {
+      clearInterval(_sbInterval);
+      _sbInterval = null;
+      if (!_sbIconsSwapped) _sbSwapIcons();
+      return;
+    }
+    const b = document.createElement('div');
+    b.className = 'sb-bean';
+    b.textContent = '🫘';
+    const size = 18 + Math.random() * 34;
+    b.style.cssText = `left:${Math.random()*100}vw;font-size:${size}px;animation-duration:${1.2+Math.random()*2.8}s;animation-delay:0s`;
+    document.body.appendChild(b);
+    _sbBeans.push(b);
+    setTimeout(() => { b.remove(); _sbBeans = _sbBeans.filter(x=>x!==b); }, 4200);
+  }
+
+  // Burst 30 immediately, then continuous
+  for (let i = 0; i < 30; i++) setTimeout(spawnBean, i * 40);
+  _sbInterval = setInterval(spawnBean, 35);
+}
+
+function _sbSwapIcons() {
+  _sbIconsSwapped = true;
+  document.querySelectorAll('.nav-icon, .tbar-icon-btn svg').forEach(icon => {
+    icon.style.visibility = 'hidden';
+    const span = document.createElement('span');
+    span.className = 'sb-icon-bean';
+    span.textContent = '🫘';
+    icon.after(span);
+  });
+}
+
+function stopSuperBean() {
+  _sbActive = false;
+  clearInterval(_sbInterval);
+  _sbInterval = null;
+  _sbBeans.forEach(b => b.remove());
+  _sbBeans = [];
+  document.querySelectorAll('.sb-bean').forEach(b => b.remove());
+  if (_sbIconsSwapped) {
+    _sbIconsSwapped = false;
+    document.querySelectorAll('.sb-icon-bean').forEach(s => s.remove());
+    document.querySelectorAll('.nav-icon, .tbar-icon-btn svg').forEach(icon => { icon.style.visibility = ''; });
+  }
+  document.getElementById('sbStopBtn').classList.add('hidden');
 }
 
 // ── Stock Search Controls ─────────────────────────────────────────────────────
 
 document.getElementById('stockSearchBtn').addEventListener('click', () => {
   const v = document.getElementById('stockInput').value.trim().toUpperCase();
-  if (v) loadStockView(v);
+  if (!v) return;
+  if (v === 'BEAN') { document.getElementById('stockInput').value = ''; activateSuperBean(); return; }
+  loadStockView(v);
 });
 document.getElementById('stockInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('stockSearchBtn').click();
@@ -495,69 +963,332 @@ document.getElementById('stockInput').addEventListener('keydown', e => {
 // ── Sectors ───────────────────────────────────────────────────────────────────
 
 const SECTORS = [
-  { name: 'Technology',  icon: '💻', tickers: ['AAPL','MSFT','NVDA','GOOGL','META'] },
-  { name: 'Healthcare',  icon: '🏥', tickers: ['JNJ','PFE','UNH','ABBV','MRK'] },
-  { name: 'Finance',     icon: '🏦', tickers: ['JPM','BAC','GS','MS','WFC'] },
-  { name: 'Energy',      icon: '⚡', tickers: ['XOM','CVX','COP','EOG','SLB'] },
-  { name: 'Consumer',    icon: '🛒', tickers: ['AMZN','TSLA','WMT','HD','NKE'] },
-  { name: 'Industrials', icon: '🏭', tickers: ['CAT','DE','BA','UPS','HON'] },
-  { name: 'Utilities',   icon: '💡', tickers: ['NEE','DUK','SO','AEP','EXC'] },
-  { name: 'Real Estate', icon: '🏢', tickers: ['AMT','PLD','EQIX','CCI','SPG'] },
+  { name: 'Technology',  desc: 'Software, hardware, semiconductors & cloud',         tickers: ['AAPL','MSFT','NVDA','GOOGL','META','AMD','INTC','CRM','ORCL','ADBE'] },
+  { name: 'Healthcare',  desc: 'Pharma, biotech, medical devices & managed care',    tickers: ['JNJ','PFE','UNH','ABBV','MRK','LLY','BMY','GILD','AMGN','CVS'] },
+  { name: 'Finance',     desc: 'Banks, asset managers, insurance & payment networks',tickers: ['JPM','BAC','GS','MS','WFC','C','BLK','AXP','V','MA'] },
+  { name: 'Energy',      desc: 'Oil, natural gas, refining & oilfield services',     tickers: ['XOM','CVX','COP','EOG','SLB','OXY','PSX','VLO','HAL','DVN'] },
+  { name: 'Consumer',    desc: 'Retail, e-commerce, restaurants, autos & apparel',  tickers: ['AMZN','TSLA','WMT','HD','NKE','TGT','SBUX','LOW','MCD','F'] },
+  { name: 'Industrials', desc: 'Aerospace, defense, machinery & logistics',          tickers: ['CAT','DE','BA','UPS','HON','MMM','GE','LMT','RTX','NOC'] },
+  { name: 'Utilities',   desc: 'Electric, gas & water — defensive, dividend-heavy',  tickers: ['NEE','DUK','SO','AEP','EXC','D','XEL','AES','ED','AWK'] },
+  { name: 'Real Estate', desc: 'REITs — data centers, towers, warehouses & retail', tickers: ['AMT','PLD','EQIX','CCI','SPG','WELL','DLR','O','PSA','AVB'] },
 ];
 
 async function loadSectors() {
-  const perf = document.getElementById('sectorPerfRow');
-  const grid = document.getElementById('sectorGrid');
+  const perfEl = document.getElementById('sectorPerfRow');
+  const grid   = document.getElementById('sectorGrid');
+  grid.className = 'sec-grid-clean';
+
+  let perfMap = {};
   try {
     const data = await API.getSectors();
-    perf.innerHTML = (data || []).map(s => `
-      <span class="perf-chip ${(s.atdChange||0) >= 0 ? 'up' : 'down'}">
-        ${esc(s.sector)} ${(s.atdChange||0) >= 0 ? '▲' : '▼'} ${Math.abs(s.atdChange||0).toFixed(2)}%
-      </span>`).join('');
-  } catch { perf.innerHTML = ''; }
+    (data || []).forEach(s => { perfMap[s.sector] = s.atdChange || 0; });
+  } catch {}
+
+  // Sort sectors best → worst for the performance bar
+  const sorted = [...SECTORS].sort((a, b) => {
+    const ca = a.name in perfMap ? perfMap[a.name] : -999;
+    const cb = b.name in perfMap ? perfMap[b.name] : -999;
+    return cb - ca;
+  });
+
+  perfEl.innerHTML = `<div class="sec-perf-bar">${sorted.map(s => {
+    const chg = s.name in perfMap ? perfMap[s.name] : null;
+    const cls = chg === null ? '' : chg >= 0 ? 'up' : 'down';
+    const id  = `sec-${s.name.replace(/\s+/g, '-')}`;
+    return `<div class="sec-pill ${cls}"
+      onclick="document.getElementById('${id}').scrollIntoView({behavior:'smooth',block:'start'})">
+      <span>${s.name}</span>
+      <span class="sp-chg">${chg !== null ? (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%' : '—'}</span>
+    </div>`;
+  }).join('')}</div>`;
 
   grid.innerHTML = SECTORS.map(s => {
-    const id = 'sec-' + s.name.replace(/\s+/g, '-');
+    const id  = `sec-${s.name.replace(/\s+/g, '-')}`;
+    const chg = s.name in perfMap ? perfMap[s.name] : null;
     return `
-      <div class="sector-card">
-        <div class="sector-head" onclick="toggleSector(this,'${id}')">
-          <span class="s-name-wrap"><span class="s-icon">${s.icon}</span>${s.name}</span>
-          <span class="s-chevron">▼</span>
+      <div class="sec-card-clean" id="${id}">
+        <div class="sec-card-header">
+          <span class="sec-card-name">${s.name}</span>
+          <span class="sec-card-desc">${s.desc}</span>
+          ${chg !== null ? `<span class="sec-card-chg ${chg >= 0 ? 'up' : 'down'}">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</span>` : ''}
         </div>
-        <div class="sector-stocks" id="${id}">
-          ${s.tickers.map(t => `
-            <div class="s-row" onclick="showView('search'); loadStockView('${t}')">
-              <span class="s-ticker">${t}</span>
-              <span class="s-name">${tickerName(t)}</span>
-              <span class="s-price" id="sp-${t}">—</span>
-            </div>`).join('')}
-        </div>
+        <table class="sec-stock-table">
+          <tbody>
+            ${s.tickers.map(t => `
+              <tr onclick="loadStockView('${t}')">
+                <td class="sec-td-ticker">${t}</td>
+                <td class="sec-td-name">${tickerName(t)}</td>
+                <td class="sec-td-price" id="stp-${t}">—</td>
+                <td class="sec-td-chg"   id="stc-${t}">—</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
       </div>`;
   }).join('');
+
+  loadAllSectorPrices();
 }
 
-function toggleSector(head, id) {
-  const stocks = document.getElementById(id);
-  const open = stocks.classList.contains('open');
-  stocks.classList.toggle('open', !open);
-  head.classList.toggle('open', !open);
-  if (!open) {
-    const tickers = [...stocks.querySelectorAll('.s-row')].map(r => r.querySelector('.s-ticker').textContent);
-    fetchSectorPrices(tickers);
+async function loadAllSectorPrices() {
+  const allTickers = SECTORS.flatMap(s => s.tickers);
+  const chunks = [];
+  for (let i = 0; i < allTickers.length; i += 30) chunks.push(allTickers.slice(i, i + 30));
+
+  const batchResults = await Promise.allSettled(chunks.map(c => API.getBatch(c.join(','))));
+  const priceData = {};
+  batchResults.forEach(r => {
+    if (r.status !== 'fulfilled') return;
+    r.value.forEach(d => {
+      if (d.quote?.c) priceData[d.ticker] = { price: d.quote.c, chg: d.quote.dp ?? 0 };
+    });
+  });
+
+  allTickers.forEach(t => {
+    const priceEl = document.getElementById('stp-' + t);
+    const chgEl   = document.getElementById('stc-' + t);
+    if (!priceEl || !chgEl) return;
+    const d = priceData[t];
+    if (!d) { priceEl.textContent = '—'; chgEl.textContent = '—'; return; }
+    priceEl.textContent = `$${d.price.toFixed(2)}`;
+    chgEl.textContent   = `${d.chg >= 0 ? '+' : ''}${d.chg.toFixed(2)}%`;
+    chgEl.className     = `sec-td-chg ${d.chg >= 0 ? 'up' : 'down'}`;
+  });
+}
+
+// ── IPO Calendar ─────────────────────────────────────────────────────────────
+
+let _ipoData   = [];
+let _ipoFilter = 'all';
+
+async function loadIPOs() {
+  const el = document.getElementById('ipoGrid');
+  el.innerHTML = `<div style="padding:40px 0">${spinner()}</div>`;
+  try {
+    _ipoData = await API.getIPOs();
+    renderIPOs();
+  } catch (e) {
+    el.innerHTML = errState('Could not load IPO data — ' + e.message);
   }
 }
 
-async function fetchSectorPrices(tickers) {
-  const results = await Promise.allSettled(tickers.map(t => API.getQuote(t)));
-  tickers.forEach((t, i) => {
-    const el = document.getElementById('sp-' + t);
-    if (!el || results[i].status !== 'fulfilled') return;
-    const q = results[i].value.quote;
-    const chg = q.dp ?? 0;
-    el.textContent = '$' + (q.c || 0).toFixed(2);
-    el.style.color = chg >= 0 ? 'var(--green)' : 'var(--red)';
+function renderIPOs() {
+  const el = document.getElementById('ipoGrid');
+  const list = _ipoFilter === 'all' ? _ipoData : _ipoData.filter(ipo => ipo.status === _ipoFilter);
+
+  if (!list.length) {
+    el.innerHTML = `
+      <div class="empty-state">
+        <div class="es-icon">🔍</div>
+        <div class="es-title">No IPOs found</div>
+        <div class="es-body">No ${_ipoFilter === 'all' ? '' : _ipoFilter + ' '}IPOs in the past 30 days or next 90 days. Check back soon.</div>
+      </div>`;
+    return;
+  }
+
+  // Sort: upcoming first, then by date descending
+  const statusOrder = { expected: 0, priced: 1, filed: 2, withdrawn: 3 };
+  const sorted = [...list].sort((a, b) => {
+    const so = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9);
+    if (so !== 0) return so;
+    return new Date(b.date || 0) - new Date(a.date || 0);
   });
+
+  el.innerHTML = `<div class="ipo-grid">${sorted.map(ipoCard).join('')}</div>`;
 }
+
+function downloadICS(btn) {
+  const name   = btn.dataset.name;
+  const date   = btn.dataset.date;
+  const symbol = btn.dataset.sym;
+  if (!date) { alert('No date available for this IPO.'); return; }
+  const d   = date.replace(/-/g, '');
+  const uid = `ipo-${symbol || name}-${d}@beanstock`;
+  const title = `IPO: ${name}${symbol ? ' (' + symbol + ')' : ''}`;
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//BeanStock//IPO Calendar//EN',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTART;VALUE=DATE:${d}`,
+    `DTEND;VALUE=DATE:${d}`,
+    `SUMMARY:${title}`,
+    `DESCRIPTION:${name} IPO — track live on BeanStock.`,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: `IPO-${symbol || name}.ics` });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+}
+
+function ipoCard(ipo) {
+  const STATUS = {
+    expected:  { cls: 'expected',  label: 'Upcoming',  tip: 'Scheduled for a future date' },
+    priced:    { cls: 'priced',    label: 'Priced',    tip: 'Price has been set — trading imminent' },
+    filed:     { cls: 'filed',     label: 'Filed',     tip: 'Company has filed with the SEC, date TBD' },
+    withdrawn: { cls: 'withdrawn', label: 'Withdrawn', tip: 'IPO was cancelled or postponed' },
+  };
+  const s   = STATUS[ipo.status] || STATUS.filed;
+  const val = ipo.totalSharesValue
+    ? (ipo.totalSharesValue >= 1000 ? '$' + (ipo.totalSharesValue / 1000).toFixed(1) + 'B' : '$' + ipo.totalSharesValue.toFixed(0) + 'M')
+    : '—';
+  const shares = ipo.numberOfShares
+    ? (ipo.numberOfShares >= 1e6 ? (ipo.numberOfShares / 1e6).toFixed(1) + 'M' : (ipo.numberOfShares / 1e3).toFixed(0) + 'K')
+    : '—';
+  const calBtn = (ipo.status === 'expected' || ipo.status === 'priced') && ipo.date
+    ? `<button class="ipo-cal-btn" onclick="downloadICS(this)" data-name="${esc(ipo.name || '')}" data-date="${esc(ipo.date || '')}" data-sym="${esc(ipo.symbol || '')}">📅 Add to Calendar</button>`
+    : '';
+
+  return `
+    <div class="ipo-card">
+      <div class="ipo-card-head">
+        <div class="ipo-name-block">
+          <div class="ipo-name">${esc(ipo.name || 'Unknown Company')}</div>
+          <div class="ipo-meta">
+            ${ipo.symbol ? `<span class="ipo-sym">${esc(ipo.symbol)}</span>` : ''}
+            ${ipo.exchange ? `<span class="ipo-exchange">${esc(ipo.exchange)}</span>` : ''}
+          </div>
+        </div>
+        <span class="ipo-badge ${s.cls}" title="${s.tip}">${s.label}</span>
+      </div>
+      <div class="ipo-stats">
+        <div class="ipo-stat"><span class="ipo-sl">Date</span><span class="ipo-sv">${esc(ipo.date || '—')}</span></div>
+        <div class="ipo-stat"><span class="ipo-sl">Price Range</span><span class="ipo-sv">${esc(ipo.price || '—')}</span></div>
+        <div class="ipo-stat"><span class="ipo-sl">Shares</span><span class="ipo-sv">${shares}</span></div>
+        <div class="ipo-stat"><span class="ipo-sl">Deal Size</span><span class="ipo-sv">${val}</span></div>
+      </div>
+      ${calBtn}
+    </div>`;
+}
+
+// IPO filter tabs
+document.getElementById('view-ipos')?.addEventListener('click', e => {
+  const tab = e.target.closest('.ipo-tab');
+  if (!tab) return;
+  document.querySelectorAll('.ipo-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  _ipoFilter = tab.dataset.filter;
+  renderIPOs();
+});
+
+// ── Penny Stocks ─────────────────────────────────────────────────────────────
+
+let _pennyData   = [];
+let _pennyMaxP   = 5;
+let _pennyMinP   = 0;
+
+async function loadPennyStocks() {
+  const grid = document.getElementById('pennyGrid');
+  grid.innerHTML = `<div style="padding:40px 0">${spinner()}</div>`;
+  loadPennySentimentBar();
+  try {
+    _pennyData = await API.getPennyStocks(5); // always load full $5 dataset; tabs filter client-side
+    renderPennyGrid();
+  } catch (e) {
+    grid.innerHTML = errState('Could not load penny stocks — ' + e.message);
+  }
+}
+
+function renderPennyGrid() {
+  const grid = document.getElementById('pennyGrid');
+  const list = _pennyMinP > 0
+    ? _pennyData.filter(s => s.price >= _pennyMinP && s.price <= _pennyMaxP)
+    : _pennyData.filter(s => s.price <= _pennyMaxP);
+
+  if (!list.length) {
+    grid.innerHTML = `<div class="empty-state"><div class="es-icon">💸</div><div class="es-title">No penny stocks found</div><div class="es-body">Try a different price filter or refresh.</div></div>`;
+    return;
+  }
+
+  grid.innerHTML = `<div class="penny-grid">${list.map(pennyCard).join('')}</div>`;
+}
+
+function pennyCard(s) {
+  const up  = s.change >= 0;
+  const col = up ? 'var(--green)' : 'var(--red)';
+  const vol = s.volume >= 1e6 ? (s.volume / 1e6).toFixed(1) + 'M'
+            : s.volume >= 1e3 ? (s.volume / 1e3).toFixed(0) + 'K' : s.volume;
+  const mcap = s.marketCap >= 1e9 ? '$' + (s.marketCap / 1e9).toFixed(2) + 'B'
+             : s.marketCap >= 1e6 ? '$' + (s.marketCap / 1e6).toFixed(1) + 'M'
+             : s.marketCap > 0   ? '$' + s.marketCap : '—';
+  const alert = s.price < 0.1 ? '<span class="penny-risk-tag">⚠️ Sub-penny</span>' : s.price < 0.5 ? '<span class="penny-risk-tag">🔴 High Risk</span>' : '';
+
+  return `
+    <div class="penny-card" onclick="loadStockView('${esc(s.symbol)}')">
+      <div class="penny-card-top">
+        <div>
+          <div class="penny-sym">${esc(s.symbol)} ${alert}</div>
+          <div class="penny-name">${esc(s.name)}</div>
+        </div>
+        <div class="penny-price-wrap">
+          <div class="penny-price">$${s.price.toFixed(s.price < 0.1 ? 4 : 2)}</div>
+          <div class="penny-chg" style="color:${col}">${up ? '▲' : '▼'} ${Math.abs(s.change).toFixed(2)}%</div>
+        </div>
+      </div>
+      <div class="penny-stats">
+        <div class="penny-stat"><span class="ps-lbl">Volume</span><span class="ps-val">${vol}</span></div>
+        <div class="penny-stat"><span class="ps-lbl">Mkt Cap</span><span class="ps-val">${mcap}</span></div>
+      </div>
+      <div class="penny-sent-row" id="psent-${esc(s.symbol)}">
+        <span class="ps-lbl">Sentiment</span><span class="ps-loading">Loading…</span>
+      </div>
+    </div>`;
+}
+
+async function loadPennySentimentBar() {
+  const el = document.getElementById('pennySentBar');
+  try {
+    // Use penny-weighted trending sentiment from the trending endpoint, with penny context
+    const d = await API.getTrending();
+    const v = marketVerdict(d.score);
+    el.innerHTML = `
+      <div class="sent-body" style="padding:0">
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+          <div class="sent-score" style="color:${sentColor(d.label)};font-size:28px">${d.score >= 0 ? '+' : ''}${d.score.toFixed(1)}</div>
+          <div>
+            <div class="sent-label" style="color:${sentColor(d.label)}">${d.label}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">Based on r/pennystocks, r/OTCstocks, r/RobinHoodPennyStocks + forums</div>
+          </div>
+          <div class="verdict-card" style="flex:1;min-width:240px;border-color:${v.color}30;background:${v.color}0e;margin:0">
+            <div class="verdict-top"><span class="verdict-icon">${v.icon}</span><span class="verdict-label" style="color:${v.color}">${v.label}</span><span class="verdict-action" style="background:${v.color}22;color:${v.color}">${v.action}</span></div>
+            <p class="verdict-advice" style="margin:4px 0 0">${v.advice}</p>
+          </div>
+        </div>
+      </div>`;
+  } catch {
+    el.innerHTML = '<p style="color:var(--muted);font-size:12px">Sentiment unavailable</p>';
+  }
+}
+
+// Load penny sentiment inline on each card (lazy, after grid renders)
+async function loadPennyCardSentiments() {
+  const visible = _pennyData.slice(0, 12); // only first 12 to avoid rate limits
+  await Promise.allSettled(visible.map(async s => {
+    try {
+      const d = await API.getPennySentiment(s.symbol);
+      const el = document.getElementById(`psent-${s.symbol}`);
+      if (!el) return;
+      const cls = d.score > 1 ? 'pos' : d.score < -1 ? 'neg' : 'neu';
+      el.innerHTML = `<span class="ps-lbl">Sentiment</span><span class="wl-sent-pill ${cls}">${d.score >= 0 ? '+' : ''}${d.score.toFixed(1)}</span><span class="ps-lbl" style="margin-left:8px">${d.label}</span>`;
+    } catch {}
+  }));
+}
+
+// Penny filter tab handler
+document.getElementById('view-pennystocks')?.addEventListener('click', e => {
+  const tab = e.target.closest('.ipo-tab');
+  if (!tab || !tab.dataset.pmax) return;
+  document.querySelectorAll('#view-pennystocks .ipo-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  _pennyMaxP = parseFloat(tab.dataset.pmax);
+  _pennyMinP = parseFloat(tab.dataset.pmin || 0);
+  renderPennyGrid();
+});
 
 // ── Reddit View ───────────────────────────────────────────────────────────────
 
@@ -616,89 +1347,173 @@ async function loadRedditView(ticker) {
 }
 
 // ── Underdogs ─────────────────────────────────────────────────────────────────
+// Definition: low media/analyst attention (proxied by market cap + 52W position)
+// with high algorithmic quality (fundamentals + EMA/Bollinger technical bias).
 
 const UNDERDOG_POOL = [
-  'F','GM','INTC','IBM','VZ','T','KHC','WBA','CVS','MO',
-  'PARA','DIS','C','USB','WFC','OXY','DVN','MMM','GE','HPQ',
-  'CSCO','SLB','PSX','SO','D',
+  // Energy — cyclical, often deeply undervalued, little media love outside oil spikes
+  'OXY','DVN','HAL','SLB','PSX','VLO','MRO','APA','CNX','CIVI','MTDR','RRC','AR',
+  // Finance — regional banks and old-guard players trade at deep discounts with no hype
+  'C','USB','KEY','FITB','RF','ZION','BK','STT','MTB','CFG','TFC','HBAN',
+  // Technology — old-guard tech overshadowed by AI narrative despite solid fundamentals
+  'INTC','IBM','HPQ','CSCO','JNPR','DELL','STX','WDC',
+  // Healthcare — large pharma with real earnings but pipeline skepticism keeps P/E low
+  'BMY','PFE','MRK','ABBV','GILD','BIIB','VTRS','AMGN',
+  // Consumer — brand fatigue, margin pressure — the market has priced in maximum pessimism
+  'KHC','WBA','PARA','DIS','MO','PM','F','GM','VFC','HBI','BTI',
+  // Industrials — boring compounders that rarely trend on social media
+  'MMM','GE','HON','EMR','ETN','DOV','ROK',
+  // Communications — priced like dying businesses despite massive infrastructure value
+  'VZ','T','LUMN',
+  // Utilities — rate-sensitive but operationally resilient; zero retail investor excitement
+  'D','SO','AES','NRG','AEE','CMS','DTE','LNT','POR',
+  // REITs — punished by rate fears, real estate cashflows largely intact
+  'VNO','SLG','BXP','KIM','REG','FRT','EPR','MPW',
 ];
 
 async function loadUnderdogs() {
   const el = document.getElementById('underdogGrid');
   el.innerHTML = `<div style="padding:20px 0">${spinner()}</div>`;
   try {
-    const data = await API.getBatch(UNDERDOG_POOL.join(','));
+    // Stage 1 — batch fundamentals for all ~81 tickers in chunks of 30
+    const chunks = [];
+    for (let i = 0; i < UNDERDOG_POOL.length; i += 30) chunks.push(UNDERDOG_POOL.slice(i, i + 30));
+    const batchResults = await Promise.allSettled(chunks.map(c => API.getBatch(c.join(','))));
 
-    const scored = data
-      .filter(d => d.quote && d.metrics && d.quote.c > 0)
+    const allData = [];
+    batchResults.forEach(r => {
+      if (r.status !== 'fulfilled') return;
+      r.value.forEach(d => { if (d.quote?.c > 0 && d.metrics) allData.push(d); });
+    });
+
+    const fundamentalScored = allData
       .map(d => {
-        const { score, reasons } = scoreUnderdog(d.ticker, d.quote, d.metrics);
-        return { ...d, udScore: score, reasons };
+        const { score, reasons } = scoreUnderdogFundamentals(d.quote, d.metrics);
+        return { ...d, fundScore: score, reasons };
       })
-      .filter(d => d.udScore >= 3)
+      .filter(d => d.fundScore >= 3)
+      .sort((a, b) => b.fundScore - a.fundScore);
+
+    // Stage 2 — fetch 1Y candles for top 12 fundamental picks, compute technical bias
+    const TOP_N = 12;
+    const topStocks = fundamentalScored.slice(0, TOP_N);
+    const candleResults = await Promise.allSettled(
+      topStocks.map(d => API.getCandles(d.ticker, '1Y'))
+    );
+
+    const final = topStocks.map((d, i) => {
+      let techScore = 0;
+      let techSignal = null;
+      const candles = candleResults[i].status === 'fulfilled' ? candleResults[i].value : null;
+      if (candles?.s === 'ok' && candles.c?.length >= 15) {
+        const tech = computeTechnicals(candles.c);
+        techScore = (tech.biasScore || 0) + (tech.slopeBias || 0) + (tech.levelBias || 0);
+        if (tech.bbBias > 0) techScore += 1;
+        techSignal = tech.signal;
+      }
+      return { ...d, techScore, techSignal, udScore: d.fundScore * 0.60 + techScore * 0.40 };
+    });
+
+    const scored = final
+      .filter(d => d.udScore >= 2)
       .sort((a, b) => b.udScore - a.udScore)
-      .slice(0, 8);
+      .slice(0, 10);
 
     if (!scored.length) {
       el.innerHTML = `
         <div class="empty-state">
           <div class="es-icon">🌱</div>
           <div class="es-title">No standout underdogs today</div>
-          <div class="es-body">Current market conditions don't surface strong candidates matching all criteria. Check back after market close or try refreshing.</div>
+          <div class="es-body">No stocks in the pool currently clear all criteria. Check back after market close.</div>
         </div>`;
       return;
     }
 
     el.innerHTML = `
-      <div class="ud-count-row">${scored.length} underdogs found from a pool of ${UNDERDOG_POOL.length} stocks</div>
+      <div class="ud-count-row">${scored.length} algorithmic underdogs — low media attention, strong fundamentals</div>
       <div class="ud-grid">${scored.map(d => underdogCard(d)).join('')}</div>`;
   } catch (e) {
     el.innerHTML = errState(e.message);
   }
 }
 
-function scoreUnderdog(ticker, quote, metrics) {
+function scoreUnderdogFundamentals(quote, metrics) {
   let score = 0;
   const reasons = [];
   const price = quote.c;
   const m = metrics.metric || {};
-  const high52 = m['52WeekHigh'];
-  const low52  = m['52WeekLow'];
-  const range  = (high52 && low52 && high52 > low52) ? high52 - low52 : 0;
+  const high52  = m['52WeekHigh'];
+  const low52   = m['52WeekLow'];
+  const range   = (high52 && low52 && high52 > low52) ? high52 - low52 : 0;
   const inRange = range > 0 ? (price - low52) / range : 0.5;
+  const mcapM   = m.marketCapitalization || 0; // Finnhub returns in millions
+  const mcapB   = mcapM / 1000;
 
-  if (inRange < 0.3) {
+  // 52W position — near lows means the market is sleeping on it
+  if (inRange < 0.25) {
     score += 3;
-    reasons.push(`In the bottom ${Math.round(inRange * 100)}% of its 52-week range — potential value territory`);
-  } else if (inRange < 0.5) {
+    reasons.push(`In the bottom ${Math.round(inRange * 100)}% of its 52-week range — market is deeply discounting it`);
+  } else if (inRange < 0.45) {
     score += 1;
-    reasons.push(`Trading in the lower half of its 52-week range ($${low52?.toFixed(0)}–$${high52?.toFixed(0)})`);
+    reasons.push(`Lower half of its 52-week range ($${low52?.toFixed(0)}–$${high52?.toFixed(0)})`);
   }
 
-  if (m.peNormalizedAnnual > 0 && m.peNormalizedAnnual < 12) {
+  // P/E — low P/E = value nobody is pricing in; high P/E = already hyped
+  if (m.peNormalizedAnnual > 0 && m.peNormalizedAnnual < 10) {
     score += 3;
     reasons.push(`P/E of ${m.peNormalizedAnnual.toFixed(1)}× — deeply undervalued vs. S&P 500 average (~22×)`);
-  } else if (m.peNormalizedAnnual > 0 && m.peNormalizedAnnual < 20) {
-    score += 1;
-    reasons.push(`Below-average P/E of ${m.peNormalizedAnnual.toFixed(1)}× — reasonably priced on earnings`);
+  } else if (m.peNormalizedAnnual > 0 && m.peNormalizedAnnual < 18) {
+    score += 2;
+    reasons.push(`Below-average P/E of ${m.peNormalizedAnnual.toFixed(1)}× — earnings not yet priced in by the crowd`);
+  } else if (m.peNormalizedAnnual > 30) {
+    score -= 1;
   }
 
-  if (m.epsNormalizedAnnual > 0) {
+  // Profitability — only real businesses qualify
+  if (m.epsNormalizedAnnual > 1.5) {
+    score += 2;
+    reasons.push(`Strong EPS of $${m.epsNormalizedAnnual.toFixed(2)} — materially profitable, not speculative`);
+  } else if (m.epsNormalizedAnnual > 0) {
     score += 1;
-    reasons.push(`Positive EPS of $${m.epsNormalizedAnnual.toFixed(2)} — the company is profitable`);
+    reasons.push(`Positive EPS of $${m.epsNormalizedAnnual.toFixed(2)} — generating real earnings`);
+  } else if (m.epsNormalizedAnnual < 0) {
+    score -= 2;
   }
 
+  // ROE — capital efficiency the media ignores
+  if (m.roeTTM > 15) {
+    score += 1;
+    reasons.push(`ROE of ${m.roeTTM.toFixed(1)}% — efficiently generating profit from equity`);
+  }
+
+  // Dividend — investors get paid while the market ignores the stock
   if (m.dividendYieldIndicatedAnnual > 4) {
     score += 2;
-    reasons.push(`High dividend yield of ${m.dividendYieldIndicatedAnnual.toFixed(1)}% — paid to wait for recovery`);
+    reasons.push(`${m.dividendYieldIndicatedAnnual.toFixed(1)}% dividend yield — paid to wait for the market to notice`);
   } else if (m.dividendYieldIndicatedAnnual > 2) {
     score += 1;
-    reasons.push(`Pays a ${m.dividendYieldIndicatedAnnual.toFixed(1)}% dividend yield`);
+    reasons.push(`${m.dividendYieldIndicatedAnnual.toFixed(1)}% dividend yield — steady income while overlooked`);
   }
 
-  if (m.beta > 0.3 && m.beta < 1.4) {
+  // Obscurity bonus — smaller market caps attract fewer analysts and journalists
+  if (mcapB > 0) {
+    if (mcapB < 15) {
+      score += 2;
+      reasons.push(`Small-cap ($${mcapB.toFixed(1)}B) — minimal analyst coverage and media oxygen`);
+    } else if (mcapB < 75) {
+      score += 1;
+      reasons.push(`Mid-cap ($${mcapB.toFixed(1)}B) — flying well below the mega-cap media radar`);
+    } else if (mcapB > 400) {
+      score -= 1;
+    }
+  }
+
+  // Beta — not a meme stock, suitable for patient investors
+  if (m.beta > 0.4 && m.beta < 1.3) {
     score += 1;
-    reasons.push(`Moderate Beta (${m.beta.toFixed(2)}) — manageable volatility for a long hold`);
+    reasons.push(`Beta of ${m.beta.toFixed(2)} — sober volatility, not meme-driven noise`);
+  } else if (m.beta > 2.5) {
+    score -= 1;
   }
 
   return { score, reasons };
@@ -707,14 +1522,14 @@ function scoreUnderdog(ticker, quote, metrics) {
 function underdogCard(d) {
   const q = d.quote;
   const m = d.metrics?.metric || {};
-  const chg = q.dp ?? 0;
+  const chg  = q.dp ?? 0;
   const price = q.c || 0;
-  const tier = d.udScore >= 7 ? { label: 'Strong Pick', color: '#22c55e' }
-             : d.udScore >= 5 ? { label: 'Underdog',    color: '#14b8a6' }
-             :                  { label: 'Watch',        color: '#f59e0b' };
+  const tier = d.udScore >= 6 ? { label: 'Strong Underdog', color: '#22c55e' }
+             : d.udScore >= 4 ? { label: 'Underdog',         color: '#14b8a6' }
+             :                  { label: 'Watch',             color: '#f59e0b' };
 
   return `
-    <div class="ud-card" onclick="showView('search'); loadStockView('${esc(d.ticker)}')">
+    <div class="ud-card" onclick="loadStockView('${esc(d.ticker)}')">
       <div class="ud-card-head">
         <div>
           <div class="ud-ticker">${esc(d.ticker)}</div>
@@ -727,13 +1542,14 @@ function underdogCard(d) {
         <span class="ud-chg ${chg >= 0 ? 'up' : 'down'}">${chg >= 0 ? '▲' : '▼'} ${Math.abs(chg).toFixed(2)}%</span>
       </div>
       <div class="ud-reasons">
-        ${d.reasons.slice(0, 2).map(r => `<div class="ud-reason">✓ ${esc(r)}</div>`).join('')}
+        ${d.reasons.slice(0, 3).map(r => `<div class="ud-reason">✓ ${esc(r)}</div>`).join('')}
       </div>
+      ${d.techSignal ? `<div class="ud-tech-signal">Algorithm signal: <strong>${esc(d.techSignal)}</strong></div>` : ''}
       <div class="ud-chips">
-        ${m.peNormalizedAnnual > 0     ? `<span class="ud-chip">P/E ${m.peNormalizedAnnual.toFixed(1)}</span>` : ''}
+        ${m.peNormalizedAnnual > 0           ? `<span class="ud-chip">P/E ${m.peNormalizedAnnual.toFixed(1)}</span>` : ''}
         ${m.dividendYieldIndicatedAnnual > 0 ? `<span class="ud-chip">Div ${m.dividendYieldIndicatedAnnual.toFixed(1)}%</span>` : ''}
-        ${m.beta                        ? `<span class="ud-chip">β ${m.beta.toFixed(2)}</span>` : ''}
-        ${m.epsNormalizedAnnual > 0    ? `<span class="ud-chip">EPS $${m.epsNormalizedAnnual.toFixed(2)}</span>` : ''}
+        ${m.beta                             ? `<span class="ud-chip">β ${m.beta.toFixed(2)}</span>` : ''}
+        ${m.epsNormalizedAnnual > 0          ? `<span class="ud-chip">EPS $${m.epsNormalizedAnnual.toFixed(2)}</span>` : ''}
       </div>
       <div class="ud-cta">Click to analyze in depth →</div>
     </div>`;
@@ -781,7 +1597,7 @@ const LEARN_CATS = [
     id: 'sentiment', icon: '📡', label: 'Sentiment',
     items: [
       { icon: '📰', title: 'What is Sentiment Analysis?', body: 'Market sentiment is the overall mood of investors — bullish (optimistic) or bearish (pessimistic). BeanStock uses NLP (Natural Language Processing) to score Reddit posts, StockTwits messages, and news headlines, giving each stock a weighted sentiment score from -10 to +10.', example: 'GME in January 2021 had extreme bullish sentiment on WSB — the stock went from $20 to $480. Sentiment drove real-world prices.' },
-      { icon: '🌱', title: 'Understanding Underdogs', body: 'Underdog stocks have strong fundamentals — profitable, low P/E, paying dividends — but fly under the radar of social media and retail attention. While meme stocks get Reddit posts, underdogs quietly generate earnings near their yearly lows. BeanStock\'s Underdog finder scans 25+ stocks for these signals.', example: 'A stock with P/E of 9, positive EPS, 5% dividend yield, trading at its 52-week low — low hype, high fundamental value. That\'s an underdog.' },
+      { icon: '🌱', title: 'Understanding Underdogs', body: 'An underdog is a stock the media, Reddit, and "guru" influencers are ignoring — but algorithmic analysis reveals it should be performing significantly better than its sentiment suggests. BeanStock finds underdogs using a two-stage filter: first, fundamentals (low P/E, positive EPS, dividend, market cap below the spotlight threshold); then technical analysis (EMA crossover bias, Bollinger Band position) to confirm the algorithm sees real upside the crowd has missed. High sentiment ≠ good investment. Low attention + strong fundamentals + bullish technicals = underdog.', example: 'A mid-cap energy company trading at 8× earnings with a 5% dividend yield, in the bottom 20% of its 52-week range, with zero Reddit buzz — but EMA9 crossing above EMA21. That\'s a textbook underdog.' },
       { icon: '⚠️', title: 'Limits of Sentiment', body: 'Sentiment analysis reflects what people are saying — not necessarily what\'s true. High positive sentiment can be manipulated, exaggerated, or simply wrong. Always combine sentiment with fundamentals (P/E, EPS, Beta) before making any decision. BeanStock is a research tool, not financial advice.', example: 'High Reddit buzz on a stock with negative EPS and no revenue is a red flag — the excitement may not be backed by business reality.' },
     ],
   },
@@ -889,9 +1705,12 @@ function sentimentBlock(d, maxPosts) {
 
 function sourcePanels(sources) {
   const panels = [];
-  if (sources.reddit)     panels.push(sourcePanel('Reddit',     sources.reddit.score,     sources.reddit.label,     `${sources.reddit.postCount || 0} posts`,                                             '#FF4500'));
-  if (sources.stocktwits) panels.push(sourcePanel('StockTwits', sources.stocktwits.score, sources.stocktwits.label, sources.stocktwits.total ? `${sources.stocktwits.bullish} Bull · ${sources.stocktwits.bearish} Bear` : 'No data', '#40A0D0'));
-  if (sources.news)       panels.push(sourcePanel('News',       sources.news.score,       sources.news.label,       `${sources.news.articles?.length || 0} articles`,                                    '#F5A623'));
+  if (sources.reddit)     panels.push(sourcePanel('Reddit',         sources.reddit.score,     sources.reddit.label,     `${sources.reddit.postCount || 0} posts`,                                                              '#FF4500'));
+  if (sources.stocktwits) panels.push(sourcePanel('StockTwits',     sources.stocktwits.score, sources.stocktwits.label, sources.stocktwits.total ? `${sources.stocktwits.bullish} Bull · ${sources.stocktwits.bearish} Bear` : 'No data', '#40A0D0'));
+  if (sources.news)       panels.push(sourcePanel('Yahoo News',     sources.news.score,       sources.news.label,       `${sources.news.articles?.length || 0} articles`,                                                     '#F5A623'));
+  if (sources.wsj)        panels.push(sourcePanel('WSJ',            sources.wsj.score,        sources.wsj.label,        sources.wsj.directMentions > 0 ? `${sources.wsj.directMentions} mentions` : 'Market-wide',           '#C9A227'));
+  if (sources.sa)         panels.push(sourcePanel('Seeking Alpha',  sources.sa.score,         sources.sa.label,         `${sources.sa.articleCount || 0} articles`,                                                           '#FF5733'));
+  if (sources.forum)      panels.push(sourcePanel('Forums',         sources.forum.score,      sources.forum.label,      `${sources.forum.postCount || 0} posts`,                                                              '#6366F1'));
   if (!panels.length) return '';
   return `<div class="source-grid">${panels.join('')}</div>`;
 }
@@ -1005,6 +1824,101 @@ document.addEventListener('mouseout', e => {
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
+// ── Connect Page ──────────────────────────────────────────────────────────────
+
+function loadConnect() {
+  const el = document.getElementById('connectBody');
+  if (!el) return;
+
+  // Bookmarklet: detects ticker from selection → URL → title → prompt, then opens companion window
+  const bmCode = `(function(){` +
+    `var t=(window.getSelection()||{}).toString().trim().toUpperCase().replace(/[^A-Z.]/g,'');` +
+    `var P=[/\\/stocks\\/([A-Z]{1,5})(?:\\/|\\?|$)/i,/\\/quote\\/([A-Z.]{1,6})(?:\\/|:|\\?|$)/i,` +
+    `/\\/symbol\\/([A-Z]{1,5})(?:\\/|\\?|$)/i,/[?&]t=([A-Z]{1,5})(?:&|$)/i,` +
+    `/\\/stock\\/([A-Z]{1,5})(?:\\/|\\?|$)/i,/\\/([A-Z]{2,5})\\/(?:summary|overview|chart)/i];` +
+    `if(!t)for(var i=0;i<P.length;i++){var m=location.href.match(P[i]);if(m){t=m[1].toUpperCase();break;}}` +
+    `if(!t){var r=document.title.match(/^\\$?([A-Z]{2,5})\\s*[-|–]/);if(r)t=r[1];}` +
+    `if(!t)t=prompt('Enter ticker (e.g. AAPL):','');` +
+    `if(t)window.open('http://localhost:3001/?quick='+t,'BeanStock','width=460,height=720,top=20,left='+Math.max(0,screen.width-490));` +
+    `})()`;
+
+  const sites = ['Robinhood','Webull','Yahoo Finance','MarketWatch','Seeking Alpha',
+                 'Google Finance','TD Ameritrade','Fidelity','StockAnalysis','Finviz','TradingView'];
+
+  el.innerHTML = `
+    <div class="connect-hero">
+      <div class="connect-hero-icon">🔌</div>
+      <h2 class="connect-hero-title">BeanStock — Anywhere</h2>
+      <p class="connect-hero-sub">Get instant Buy / Hold / Sell analysis on any stock, on any trading site, with one click.</p>
+    </div>
+
+    <div class="connect-steps-grid">
+      <div class="connect-step-card">
+        <div class="csc-num">1</div>
+        <div class="csc-body">
+          <div class="csc-title">Keep BeanStock running</div>
+          <div class="csc-desc">The server must be active on port 3001. Run it in a terminal — or start it silently in the background with the script below.</div>
+          <code class="connect-inline-code">node server/index.js</code>
+        </div>
+      </div>
+
+      <div class="connect-step-card">
+        <div class="csc-num">2</div>
+        <div class="csc-body">
+          <div class="csc-title">Drag the bookmarklet to your browser bar</div>
+          <div class="csc-desc">This button is a live bookmarklet — drag it to your bookmarks bar. One click on any page opens a companion BeanStock window.</div>
+          <div class="bm-drag-zone">
+            <a id="bm-link" class="bm-drag-btn" title="Drag to your bookmarks bar">🫘 BeanStock Quick</a>
+            <span class="bm-drag-arrow">← drag me</span>
+          </div>
+          <div class="bm-tip">💡 Tip: select a ticker first and it auto-detects it. Otherwise a prompt appears.</div>
+        </div>
+      </div>
+
+      <div class="connect-step-card">
+        <div class="csc-num">3</div>
+        <div class="csc-body">
+          <div class="csc-title">Works with all major platforms</div>
+          <div class="csc-desc">Auto-detects tickers from URLs and page titles on popular brokerages and finance sites.</div>
+          <div class="connect-sites">${sites.map(s => `<span class="site-chip">${s}</span>`).join('')}</div>
+        </div>
+      </div>
+
+      <div class="connect-step-card highlight-card">
+        <div class="csc-num">4</div>
+        <div class="csc-body">
+          <div class="csc-title">Try it right now</div>
+          <div class="csc-desc">Type any ticker below and open the companion window to preview exactly what you'll see.</div>
+          <div class="connect-test-row">
+            <input id="connectTestInput" class="connect-test-input" placeholder="AAPL, TSLA, NVDA…" maxlength="6" />
+            <button class="btn-primary" onclick="testConnectQuick()">Open companion →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connect-bg-card">
+      <div class="connect-bg-icon">🖥️</div>
+      <div>
+        <div class="connect-bg-title">Run BeanStock in the background (macOS)</div>
+        <div class="connect-bg-desc">Paste this into Terminal once. BeanStock starts silently and stays running even after you close the terminal.</div>
+        <pre class="connect-bg-code">cd ~/programs/beanstock/v2 &amp;&amp; nohup node server/index.js &gt; /tmp/beanstock.log 2&gt;&amp;1 &amp;
+echo "🫘 BeanStock started — PID $!"</pre>
+        <div class="connect-bg-stop">To stop: <code>pkill -f "beanstock/v2/server"</code></div>
+      </div>
+    </div>`;
+
+  // Set bookmarklet href programmatically (avoids HTML-entity issues)
+  const bmLink = document.getElementById('bm-link');
+  if (bmLink) bmLink.href = 'javascript:' + bmCode;
+}
+
+function testConnectQuick() {
+  const t = (document.getElementById('connectTestInput')?.value || '').trim().toUpperCase().replace(/[^A-Z.]/g, '');
+  if (!t) { document.getElementById('connectTestInput')?.focus(); return; }
+  window.open(`/?quick=${t}`, 'BeanStock', `width=460,height=720,top=20,left=${Math.max(0, screen.width - 490)}`);
+}
+
 function spinner() { return '<div class="spin-wrap"><div class="spin"></div></div>'; }
 
 function errState(msg, action) {
@@ -1055,28 +1969,68 @@ function esc(s) {
 }
 
 const NAMES = {
+  // Mega-cap / S&P 500 well-knowns
   AAPL:'Apple',MSFT:'Microsoft',NVDA:'NVIDIA',GOOGL:'Alphabet',META:'Meta',
-  AMZN:'Amazon',TSLA:'Tesla',JNJ:'J&J',PFE:'Pfizer',UNH:'UnitedHealth',
-  ABBV:'AbbVie',MRK:'Merck',JPM:'JPMorgan',BAC:'BofA',GS:'Goldman',
+  AMZN:'Amazon',TSLA:'Tesla',JNJ:'Johnson & Johnson',PFE:'Pfizer',UNH:'UnitedHealth',
+  ABBV:'AbbVie',MRK:'Merck',JPM:'JPMorgan Chase',BAC:'Bank of America',GS:'Goldman Sachs',
   MS:'Morgan Stanley',WFC:'Wells Fargo',XOM:'ExxonMobil',CVX:'Chevron',
   COP:'ConocoPhillips',EOG:'EOG Resources',SLB:'SLB',WMT:'Walmart',
-  HD:'Home Depot',NKE:'Nike',CAT:'Caterpillar',DE:'John Deere',BA:'Boeing',
-  UPS:'UPS',HON:'Honeywell',NEE:'NextEra',DUK:'Duke Energy',SO:'Southern Co',
-  AEP:'Am Electric Power',EXC:'Exelon',AMT:'Am Tower',PLD:'Prologis',
-  EQIX:'Equinix',CCI:'Crown Castle',SPG:'Simon Property',
+  HD:'Home Depot',NKE:'Nike',TGT:'Target',SBUX:'Starbucks',LOW:'Lowe\'s',MCD:'McDonald\'s',
+  CAT:'Caterpillar',DE:'John Deere',BA:'Boeing',UPS:'UPS',HON:'Honeywell',
+  LMT:'Lockheed Martin',RTX:'RTX Corporation',NOC:'Northrop Grumman',
+  NEE:'NextEra Energy',DUK:'Duke Energy',AEP:'Am Electric Power',EXC:'Exelon',
+  AMT:'American Tower',PLD:'Prologis',EQIX:'Equinix',CCI:'Crown Castle',SPG:'Simon Property',
+  WELL:'Welltower',DLR:'Digital Realty',O:'Realty Income',PSA:'Public Storage',AVB:'AvalonBay',
+  AMD:'AMD',CRM:'Salesforce',ORCL:'Oracle',ADBE:'Adobe',LLY:'Eli Lilly',
+  BLK:'BlackRock',AXP:'American Express',V:'Visa',MA:'Mastercard',
+  // ETFs
   SPY:'S&P 500 ETF',QQQ:'NASDAQ 100 ETF',DIA:'Dow Jones ETF',IWM:'Russell 2000 ETF',
-  F:'Ford Motor',GM:'General Motors',INTC:'Intel',IBM:'IBM Corp',VZ:'Verizon',
-  T:'AT&T',KHC:'Kraft Heinz',WBA:'Walgreens Boots',CVS:'CVS Health',MO:'Altria',
-  PARA:'Paramount',DIS:'Disney',C:'Citigroup',USB:'US Bancorp',
-  OXY:'Occidental',DVN:'Devon Energy',MMM:'3M Company',GE:'GE Aerospace',
-  HPQ:'HP Inc',CSCO:'Cisco',PSX:'Phillips 66',SO:'Southern Company',D:'Dominion',
+  // Underdog pool — energy
+  OXY:'Occidental Petroleum',DVN:'Devon Energy',HAL:'Halliburton',PSX:'Phillips 66',
+  VLO:'Valero Energy',MRO:'Marathon Oil',APA:'APA Corporation',CNX:'CNX Resources',
+  CIVI:'Civitas Resources',MTDR:'Matador Resources',RRC:'Range Resources',AR:'Antero Resources',
+  // Underdog pool — finance
+  C:'Citigroup',USB:'US Bancorp',KEY:'KeyCorp',FITB:'Fifth Third Bancorp',
+  RF:'Regions Financial',ZION:'Zions Bancorp',BK:'BNY Mellon',STT:'State Street',
+  MTB:'M&T Bank',CFG:'Citizens Financial',TFC:'Truist Financial',HBAN:'Huntington Bancshares',
+  // Underdog pool — technology old-guard
+  INTC:'Intel',IBM:'IBM',HPQ:'HP Inc',CSCO:'Cisco',JNPR:'Juniper Networks',
+  DELL:'Dell Technologies',STX:'Seagate Technology',WDC:'Western Digital',
+  // Underdog pool — healthcare
+  BMY:'Bristol-Myers Squibb',GILD:'Gilead Sciences',BIIB:'Biogen',VTRS:'Viatris',AMGN:'Amgen',
+  // Underdog pool — consumer
+  F:'Ford Motor',GM:'General Motors',KHC:'Kraft Heinz',WBA:'Walgreens Boots',
+  CVS:'CVS Health',PARA:'Paramount Global',DIS:'Disney',MO:'Altria Group',
+  PM:'Philip Morris',VFC:'VF Corporation',HBI:'Hanesbrands',BTI:'British American Tobacco',
+  // Underdog pool — industrials
+  MMM:'3M Company',GE:'GE Aerospace',EMR:'Emerson Electric',ETN:'Eaton Corporation',
+  DOV:'Dover Corporation',ROK:'Rockwell Automation',
+  // Underdog pool — communications
+  VZ:'Verizon',T:'AT&T',LUMN:'Lumen Technologies',
+  // Underdog pool — utilities
+  D:'Dominion Energy',AES:'AES Corporation',NRG:'NRG Energy',
+  AEE:'Ameren',CMS:'CMS Energy',DTE:'DTE Energy',LNT:'Alliant Energy',POR:'Portland General Electric',
+  // Underdog pool — REITs
+  VNO:'Vornado Realty',SLG:'SL Green Realty',BXP:'BXP Inc',KIM:'Kimco Realty',
+  REG:'Regency Centers',FRT:'Federal Realty',EPR:'EPR Properties',MPW:'Medical Properties Trust',
+  // Meme / popular
   GME:'GameStop',AMC:'AMC Entertainment',
 };
 function tickerName(t) { return NAMES[t] || t; }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
+// Quick mode — companion window launched from the bookmarklet (?quick=TICKER)
+(function initQuickMode() {
+  const qt = new URLSearchParams(location.search).get('quick')?.toUpperCase().trim();
+  if (!qt) return;
+  document.body.classList.add('quick-mode');
+  document.title = `${qt} — BeanStock Quick`;
+  loadStockView(qt);
+})();
+
 checkSetup();
 checkFirstVisit();
+markViewLoaded('dashboard');
 loadDashboard();
 loadLearn();

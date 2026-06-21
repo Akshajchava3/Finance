@@ -13,24 +13,23 @@ router.get('/search', async (req, res) => {
 router.get('/quote/:ticker', async (req, res) => {
   try {
     const ticker = req.params.ticker.toUpperCase();
-    const [quote, profile] = await Promise.all([fh.quote(ticker), fh.profile(ticker)]);
-    res.json({ quote, profile });
+    const [quoteR, profileR] = await Promise.allSettled([fh.quote(ticker), fh.profile(ticker)]);
+    const quote   = quoteR.status   === 'fulfilled' ? quoteR.value   : null;
+    const profile = profileR.status === 'fulfilled' ? profileR.value : null;
+    if (!quote || quote.c == null) {
+      return res.status(429).json({ error: 'Rate limited — too many requests to market data provider. Wait a moment and try again.' });
+    }
+    res.json({ quote, profile: profile || {} });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
+
+const yahooCandle = require('../services/yahoocandle');
 
 router.get('/candles/:ticker', async (req, res) => {
   try {
     const ticker = req.params.ticker.toUpperCase();
-    const now = Math.floor(Date.now() / 1000);
-    const ranges = {
-      '1W': { from: now - 7  * 86400, resolution: '60' },
-      '1M': { from: now - 30 * 86400, resolution: 'D'  },
-      '3M': { from: now - 90 * 86400, resolution: 'D'  },
-      '1Y': { from: now - 365* 86400, resolution: 'W'  },
-    };
-    const { range = '1M' } = req.query;
-    const { from, resolution } = ranges[range] || ranges['1M'];
-    res.json(await fh.candles(ticker, resolution, from, now));
+    const { range = '1D' } = req.query;
+    res.json(await yahooCandle.getCandles(ticker, range));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -61,29 +60,144 @@ router.get('/analyst/:ticker', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Batch: returns quote + metrics for multiple tickers (used by Underdogs)
+// IPO calendar — past 30 days + next 90 days
+router.get('/ipos', async (req, res) => {
+  try {
+    const now  = new Date();
+    const from = new Date(now - 30 * 86400000).toISOString().slice(0, 10);
+    const to   = new Date(now + 90 * 86400000).toISOString().slice(0, 10);
+    const data = await fh.ipoCalendar(from, to);
+    res.json(Array.isArray(data) ? data : (data?.ipoCalendar || []));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Batch: returns quote + metrics for multiple tickers in throttled chunks
+// Fires 8 tickers at a time with 120ms gaps to stay under Finnhub's rate limit.
 router.get('/batch', async (req, res) => {
   try {
     const tickers = (req.query.tickers || '')
-      .split(',').map(t => t.trim().toUpperCase()).filter(Boolean).slice(0, 30);
+      .split(',').map(t => t.trim().toUpperCase()).filter(Boolean).slice(0, 40);
 
-    const results = await Promise.allSettled(
-      tickers.map(async (ticker) => {
-        const [quoteRes, metricsRes] = await Promise.allSettled([
-          fh.quote(ticker),
-          fh.metrics(ticker),
-        ]);
-        return {
-          ticker,
-          quote:   quoteRes.status   === 'fulfilled' ? quoteRes.value   : null,
-          metrics: metricsRes.status === 'fulfilled' ? metricsRes.value : null,
-        };
-      })
-    );
+    const allResults = [];
+    const CHUNK = 8;
+    for (let i = 0; i < tickers.length; i += CHUNK) {
+      const chunk = tickers.slice(i, i + CHUNK);
+      const chunkResults = await Promise.allSettled(
+        chunk.map(async (ticker) => {
+          const [quoteRes, metricsRes] = await Promise.allSettled([
+            fh.quote(ticker),
+            fh.metrics(ticker),
+          ]);
+          return {
+            ticker,
+            quote:   quoteRes.status   === 'fulfilled' ? (quoteRes.value   || null) : null,
+            metrics: metricsRes.status === 'fulfilled' ? (metricsRes.value || null) : null,
+          };
+        })
+      );
+      allResults.push(...chunkResults);
+      if (i + CHUNK < tickers.length) await new Promise(r => setTimeout(r, 120));
+    }
 
-    res.json(results.map((r, i) =>
+    res.json(allResults.map((r, i) =>
       r.status === 'fulfilled' ? r.value : { ticker: tickers[i], quote: null, metrics: null }
     ));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Quick Analysis (companion window / bookmarklet) ───────────────────────────
+
+router.get('/quick/:ticker', async (req, res) => {
+  try {
+    const ticker = req.params.ticker.toUpperCase().replace(/[^A-Z.]/g, '');
+    if (!ticker) return res.status(400).json({ error: 'Ticker required' });
+
+    const [quoteR, metricsR, candlesR] = await Promise.allSettled([
+      fh.quote(ticker),
+      fh.metrics(ticker),
+      yahooCandle.getCandles(ticker, '6M'),
+    ]);
+
+    const quote   = quoteR.status   === 'fulfilled' ? quoteR.value   : null;
+    const metrics = metricsR.status === 'fulfilled' ? (metricsR.value || {}) : {};
+    const candles = candlesR.status === 'fulfilled' ? candlesR.value : null;
+
+    if (!quote || quote.c == null) {
+      return res.status(404).json({ error: `No data found for ${ticker}` });
+    }
+
+    const m   = metrics.metric || {};
+    const pe  = m.peTTM;
+    const roe = m.roeTTM;
+    const div = m.dividendYieldIndicatedAnnual;
+
+    // Technical signal from 6-month closes
+    let techBias = 0, support = null, resistance = null;
+    if (candles?.c?.length >= 21) {
+      const closes = candles.c;
+      const ema9  = closes.slice(-9).reduce((a, b) => a + b, 0) / 9;
+      const ema21 = closes.slice(-21).reduce((a, b) => a + b, 0) / 21;
+      techBias = ema9 > ema21 * 1.005 ? 1 : ema9 < ema21 * 0.995 ? -1 : 0;
+      const recent = closes.slice(-20);
+      support      = (Math.min(...recent) * 0.99).toFixed(2);
+      resistance   = (Math.max(...recent) * 1.01).toFixed(2);
+    }
+
+    // Fundamental signal
+    let fundBias = 0;
+    if (pe != null) fundBias += pe > 0 && pe < 15 ? 1 : pe > 35 ? -1 : 0;
+    if (roe != null) fundBias += roe > 12 ? 0.4 : 0;
+
+    // 52-week position
+    const w52h = m['52WeekHigh'];
+    const w52l = m['52WeekLow'];
+    let posLabel = '';
+    if (w52h && w52l && w52h > w52l) {
+      const pos = (quote.c - w52l) / (w52h - w52l);
+      posLabel   = pos < 0.25 ? 'Near 52W low' : pos > 0.85 ? 'Near 52W high' : '';
+      fundBias  += pos < 0.25 ? 0.5 : pos > 0.85 ? -0.3 : 0;
+    }
+
+    const score   = techBias * 0.55 + fundBias * 0.45;
+    const verdict = score >= 0.4 ? 'Buy' : score <= -0.4 ? 'Sell' : 'Hold';
+
+    const techLabel = techBias > 0 ? 'Bullish EMA crossover'
+                    : techBias < 0 ? 'Bearish EMA crossover' : 'Neutral';
+
+    const sup = support    || (quote.c * 0.95).toFixed(2);
+    const res2 = resistance || (quote.c * 1.05).toFixed(2);
+
+    const advice = verdict === 'Buy'
+      ? `${ticker} shows positive signals${posLabel ? ' — ' + posLabel : ''}. Consider accumulating near the $${sup} support zone.`
+      : verdict === 'Sell'
+      ? `${ticker} shows negative signals. Watch the $${res2} resistance — consider trimming if it fails to break through.`
+      : `${ticker} is mixed. Watch for a breakout above $${res2} or breakdown below $${sup} for direction.`;
+
+    res.json({
+      ticker,
+      price:      quote.c.toFixed(2),
+      change:     quote.dp ?? 0,
+      verdict,
+      confidence: verdict === 'Buy' ? 'Strong signals' : verdict === 'Sell' ? 'Weak signals' : 'Mixed signals',
+      advice,
+      support:    sup,
+      resistance: res2,
+      technical:  techLabel,
+      pe:         pe != null ? `P/E ${pe.toFixed(1)}` : null,
+      dividend:   div != null && div > 0 ? `${div.toFixed(1)}% yield` : null,
+      w52:        w52h && w52l ? `$${(+w52l).toFixed(2)} – $${(+w52h).toFixed(2)}` : null,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Penny Stocks ──────────────────────────────────────────────────────────────
+
+const pennyScreen = require('../services/pennyscreen');
+
+router.get('/penny', async (req, res) => {
+  try {
+    const maxPrice = parseFloat(req.query.max) || 5;
+    res.json(await pennyScreen.getPennyStocks(maxPrice));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
