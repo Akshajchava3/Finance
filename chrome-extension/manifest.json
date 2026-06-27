@@ -1,70 +1,34 @@
 {
   "manifest_version": 3,
-  "name": "BeanStock Quick Analysis",
+  "name": "BeanStock Extension + Agent",
   "short_name": "BeanStock",
-  "version": "1.0.0",
-  "description": "Auto-detects tickers on any stock site and shows Buy/Hold/Sell analysis from your local BeanStock server. Zero clicks required.",
+  "version": "2.0.0",
+  "description": "AI agent that auto-detects any stock ticker on any website and delivers instant Buy/Hold/Sell analysis, peer comparison, and news — zero clicks required.",
 
   "permissions": [
     "storage",
     "activeTab",
-    "scripting"
+    "scripting",
+    "contextMenus"
   ],
 
   "host_permissions": [
     "http://localhost:3001/*",
-    "*://*.robinhood.com/*",
-    "*://*.webull.com/*",
-    "*://*.finance.yahoo.com/*",
-    "*://*.marketwatch.com/*",
-    "*://*.seekingalpha.com/*",
-    "*://*.tradingview.com/*",
-    "*://www.google.com/finance*",
-    "*://*.finviz.com/*",
-    "*://*.stockanalysis.com/*",
-    "*://*.fidelity.com/*",
-    "*://*.schwab.com/*",
-    "*://*.tdameritrade.com/*",
-    "*://*.wsj.com/*",
-    "*://*.bloomberg.com/*",
-    "*://*.cnbc.com/*",
-    "*://*.nasdaq.com/*",
-    "*://*.fool.com/*",
-    "*://*.barrons.com/*",
-    "*://*.zacks.com/*"
+    "<all_urls>"
   ],
 
   "content_scripts": [
     {
-      "matches": [
-        "*://*.robinhood.com/*",
-        "*://*.webull.com/*",
-        "*://*.finance.yahoo.com/*",
-        "*://*.marketwatch.com/*",
-        "*://*.seekingalpha.com/*",
-        "*://*.tradingview.com/*",
-        "*://www.google.com/finance*",
-        "*://*.finviz.com/*",
-        "*://*.stockanalysis.com/*",
-        "*://*.fidelity.com/*",
-        "*://*.schwab.com/*",
-        "*://*.tdameritrade.com/*",
-        "*://*.wsj.com/*",
-        "*://*.bloomberg.com/*",
-        "*://*.cnbc.com/*",
-        "*://*.nasdaq.com/*",
-        "*://*.fool.com/*",
-        "*://*.barrons.com/*",
-        "*://*.zacks.com/*"
-      ],
+      "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
 
   "action": {
     "default_popup": "popup.html",
-    "default_title": "BeanStock — Analyze this stock",
+    "default_title": "BeanStock Agent",
     "default_icon": {
       "16":  "icons/icon16.png",
       "48":  "icons/icon48.png",

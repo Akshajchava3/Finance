@@ -105,88 +105,160 @@ router.get('/batch', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ── Quick Analysis (companion window / bookmarklet) ───────────────────────────
+// ── Quick Analysis core — shared by /quick and /compare ───────────────────────
+
+async function analyzeQuick(ticker) {
+  const [quoteR, metricsR, candlesR] = await Promise.allSettled([
+    fh.quote(ticker),
+    fh.metrics(ticker),
+    yahooCandle.getCandles(ticker, '6M'),
+  ]);
+
+  const quote   = quoteR.status   === 'fulfilled' ? quoteR.value   : null;
+  const metrics = metricsR.status === 'fulfilled' ? (metricsR.value || {}) : {};
+  const candles = candlesR.status === 'fulfilled' ? candlesR.value : null;
+
+  if (!quote || quote.c == null) return null;
+
+  const m   = metrics.metric || {};
+  const pe  = m.peTTM;
+  const roe = m.roeTTM;
+  const div = m.dividendYieldIndicatedAnnual;
+
+  let techBias = 0, support = null, resistance = null, w52pos = null;
+  if (candles?.c?.length >= 21) {
+    const closes = candles.c;
+    const ema9   = closes.slice(-9).reduce((a, b) => a + b, 0) / 9;
+    const ema21  = closes.slice(-21).reduce((a, b) => a + b, 0) / 21;
+    techBias     = ema9 > ema21 * 1.005 ? 1 : ema9 < ema21 * 0.995 ? -1 : 0;
+    const recent = closes.slice(-20);
+    support      = (Math.min(...recent) * 0.99).toFixed(2);
+    resistance   = (Math.max(...recent) * 1.01).toFixed(2);
+  }
+
+  let fundBias = 0;
+  if (pe  != null) fundBias += pe  > 0 && pe  < 15 ? 1  : pe  > 35 ? -1   : 0;
+  if (roe != null) fundBias += roe > 12             ? 0.4              : 0;
+
+  const w52h = m['52WeekHigh'], w52l = m['52WeekLow'];
+  if (w52h && w52l && w52h > w52l) {
+    w52pos    = (quote.c - w52l) / (w52h - w52l);
+    fundBias += w52pos < 0.25 ? 0.5 : w52pos > 0.85 ? -0.3 : 0;
+  }
+
+  const score   = techBias * 0.55 + fundBias * 0.45;
+  const verdict = score >= 0.4 ? 'Buy' : score <= -0.4 ? 'Sell' : 'Hold';
+  const sup     = support    || (quote.c * 0.95).toFixed(2);
+  const res2    = resistance || (quote.c * 1.05).toFixed(2);
+
+  const confidence = Math.abs(score) > 0.75 ? 'Strong signal'
+                   : Math.abs(score) > 0.4  ? 'Moderate signal' : 'Weak signal';
+
+  return {
+    ticker,
+    price:      quote.c.toFixed(2),
+    change:     quote.dp ?? 0,
+    verdict,
+    confidence,
+    advice: verdict === 'Buy'
+      ? `${ticker}${w52pos != null && w52pos < 0.25 ? ' near 52W low —' : ''} showing buy signals. Consider accumulating near $${sup}.`
+      : verdict === 'Sell'
+      ? `${ticker} showing sell signals. Watch $${res2} resistance — trim if it stalls there.`
+      : `${ticker} is range-bound. Wait for a clean break above $${res2} or below $${sup}.`,
+    support:    sup,
+    resistance: res2,
+    technical:  techBias > 0 ? 'Bullish EMA crossover' : techBias < 0 ? 'Bearish EMA crossover' : 'Neutral',
+    pe:         pe  != null ? `P/E ${pe.toFixed(1)}`       : null,
+    dividend:   div != null && div > 0 ? `${div.toFixed(1)}% yield` : null,
+    w52:        w52h && w52l ? `$${(+w52l).toFixed(2)} – $${(+w52h).toFixed(2)}` : null,
+    _i:         { techBias, w52pos, pe, div, roe, score },
+  };
+}
+
+// Agent-style natural-language reasoning paragraph
+function agentReason(ticker, d) {
+  const { verdict, _i: { techBias, w52pos, pe, div, roe } } = d;
+  const parts = [];
+
+  if (techBias > 0)      parts.push('short-term momentum is bullish — EMA-9 has crossed above EMA-21');
+  else if (techBias < 0) parts.push('short-term momentum is bearish — EMA-9 has crossed below EMA-21');
+  else                   parts.push('no clear EMA momentum signal');
+
+  if (pe != null && pe > 0) {
+    if      (pe < 12) parts.push(`deeply undervalued at ${pe.toFixed(1)}× earnings`);
+    else if (pe < 20) parts.push(`reasonably valued at ${pe.toFixed(1)}× P/E`);
+    else if (pe < 35) parts.push(`moderate premium at ${pe.toFixed(1)}× P/E`);
+    else              parts.push(`expensive at ${pe.toFixed(1)}× P/E — priced for perfection`);
+  }
+
+  if (w52pos != null) {
+    if      (w52pos < 0.20) parts.push('near its 52-week low — a historically lower-risk entry zone');
+    else if (w52pos > 0.85) parts.push('near its 52-week high — extended, size positions carefully');
+  }
+
+  if (div != null && div > 3) parts.push(`pays a ${div.toFixed(1)}% dividend — adds income cushion`);
+  if (roe != null && roe > 20) parts.push(`${roe.toFixed(0)}% ROE signals strong capital efficiency`);
+
+  if (!parts.length) return `No decisive signals for ${ticker} right now. A wait-and-see posture is appropriate.`;
+
+  const intro = verdict === 'Buy'  ? 'Signals lean bullish — '
+              : verdict === 'Sell' ? 'Headwinds dominate — '
+              :                      'Mixed signals — ';
+  return intro + parts.slice(0, 3).join(', ') + '. (Technicals 55%, fundamentals 45%.)';
+}
+
+// ── GET /api/stocks/quick/:ticker ─────────────────────────────────────────────
 
 router.get('/quick/:ticker', async (req, res) => {
   try {
-    const ticker = req.params.ticker.toUpperCase().replace(/[^A-Z.]/g, '');
+    const ticker = req.params.ticker.toUpperCase().replace(/[^A-Z]/g, '');
     if (!ticker) return res.status(400).json({ error: 'Ticker required' });
 
-    const [quoteR, metricsR, candlesR] = await Promise.allSettled([
-      fh.quote(ticker),
-      fh.metrics(ticker),
-      yahooCandle.getCandles(ticker, '6M'),
+    const result = await analyzeQuick(ticker);
+    if (!result) return res.status(404).json({ error: `No data for ${ticker}` });
+
+    // Enrich with news + peers in parallel (non-blocking — degrade if slow)
+    const [newsR, peersR] = await Promise.allSettled([
+      fh.news(ticker),
+      fh.peers(ticker),
     ]);
 
-    const quote   = quoteR.status   === 'fulfilled' ? quoteR.value   : null;
-    const metrics = metricsR.status === 'fulfilled' ? (metricsR.value || {}) : {};
-    const candles = candlesR.status === 'fulfilled' ? candlesR.value : null;
+    const news  = newsR.status  === 'fulfilled' && Array.isArray(newsR.value)
+                ? newsR.value.slice(0, 3).map(n => ({
+                    headline: n.headline,
+                    source:   n.source,
+                    url:      n.url,
+                    time:     n.datetime,
+                  }))
+                : [];
 
-    if (!quote || quote.c == null) {
-      return res.status(404).json({ error: `No data found for ${ticker}` });
-    }
+    const peers = peersR.status === 'fulfilled' && Array.isArray(peersR.value)
+                ? peersR.value.filter(p => p !== ticker).slice(0, 5)
+                : [];
 
-    const m   = metrics.metric || {};
-    const pe  = m.peTTM;
-    const roe = m.roeTTM;
-    const div = m.dividendYieldIndicatedAnnual;
+    const { _i, ...pub } = result;
+    res.json({ ...pub, agentReason: agentReason(ticker, result), news, peers });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-    // Technical signal from 6-month closes
-    let techBias = 0, support = null, resistance = null;
-    if (candles?.c?.length >= 21) {
-      const closes = candles.c;
-      const ema9  = closes.slice(-9).reduce((a, b) => a + b, 0) / 9;
-      const ema21 = closes.slice(-21).reduce((a, b) => a + b, 0) / 21;
-      techBias = ema9 > ema21 * 1.005 ? 1 : ema9 < ema21 * 0.995 ? -1 : 0;
-      const recent = closes.slice(-20);
-      support      = (Math.min(...recent) * 0.99).toFixed(2);
-      resistance   = (Math.max(...recent) * 1.01).toFixed(2);
-    }
+// ── GET /api/stocks/compare?tickers=AAPL,MSFT,NVDA ───────────────────────────
 
-    // Fundamental signal
-    let fundBias = 0;
-    if (pe != null) fundBias += pe > 0 && pe < 15 ? 1 : pe > 35 ? -1 : 0;
-    if (roe != null) fundBias += roe > 12 ? 0.4 : 0;
+router.get('/compare', async (req, res) => {
+  try {
+    const tickers = (req.query.tickers || '')
+      .split(',').map(t => t.trim().toUpperCase().replace(/[^A-Z]/g, ''))
+      .filter(t => t.length >= 1 && t.length <= 5).slice(0, 5);
 
-    // 52-week position
-    const w52h = m['52WeekHigh'];
-    const w52l = m['52WeekLow'];
-    let posLabel = '';
-    if (w52h && w52l && w52h > w52l) {
-      const pos = (quote.c - w52l) / (w52h - w52l);
-      posLabel   = pos < 0.25 ? 'Near 52W low' : pos > 0.85 ? 'Near 52W high' : '';
-      fundBias  += pos < 0.25 ? 0.5 : pos > 0.85 ? -0.3 : 0;
-    }
+    if (!tickers.length) return res.status(400).json({ error: 'No valid tickers' });
 
-    const score   = techBias * 0.55 + fundBias * 0.45;
-    const verdict = score >= 0.4 ? 'Buy' : score <= -0.4 ? 'Sell' : 'Hold';
+    const results = await Promise.allSettled(tickers.map(t => analyzeQuick(t)));
 
-    const techLabel = techBias > 0 ? 'Bullish EMA crossover'
-                    : techBias < 0 ? 'Bearish EMA crossover' : 'Neutral';
-
-    const sup = support    || (quote.c * 0.95).toFixed(2);
-    const res2 = resistance || (quote.c * 1.05).toFixed(2);
-
-    const advice = verdict === 'Buy'
-      ? `${ticker} shows positive signals${posLabel ? ' — ' + posLabel : ''}. Consider accumulating near the $${sup} support zone.`
-      : verdict === 'Sell'
-      ? `${ticker} shows negative signals. Watch the $${res2} resistance — consider trimming if it fails to break through.`
-      : `${ticker} is mixed. Watch for a breakout above $${res2} or breakdown below $${sup} for direction.`;
-
-    res.json({
-      ticker,
-      price:      quote.c.toFixed(2),
-      change:     quote.dp ?? 0,
-      verdict,
-      confidence: verdict === 'Buy' ? 'Strong signals' : verdict === 'Sell' ? 'Weak signals' : 'Mixed signals',
-      advice,
-      support:    sup,
-      resistance: res2,
-      technical:  techLabel,
-      pe:         pe != null ? `P/E ${pe.toFixed(1)}` : null,
-      dividend:   div != null && div > 0 ? `${div.toFixed(1)}% yield` : null,
-      w52:        w52h && w52l ? `$${(+w52l).toFixed(2)} – $${(+w52h).toFixed(2)}` : null,
-    });
+    res.json(tickers.map((ticker, i) => {
+      const r = results[i];
+      if (r.status !== 'fulfilled' || !r.value) return { ticker, error: true };
+      const { _i, ...pub } = r.value;
+      return pub;
+    }));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

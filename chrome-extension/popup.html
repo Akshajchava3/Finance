@@ -129,6 +129,25 @@
     .go-btn:hover  { opacity: .88; }
     .go-btn:active { transform: scale(.96); }
 
+    /* ── Recent history section ── */
+    .hist-wrap {
+      display: none;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(129,140,248,0.09);
+    }
+    .hist-wrap.show { display: block; }
+    .hist-lbl { font-size: 9px; color: #3a5069; text-transform: uppercase; letter-spacing: .07em; font-weight: 700; margin-bottom: 7px; }
+    .hist-list { display: flex; flex-wrap: wrap; gap: 5px; }
+    .hist-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 9px; border-radius: 6px; font-size: 11px; font-weight: 700;
+      cursor: pointer; border: 1px solid transparent;
+      transition: opacity 0.15s;
+    }
+    .hist-chip:hover { opacity: .78; }
+    .hist-chip .hc-time { font-size: 9px; font-weight: 400; opacity: 0.55; }
+
     /* Footer */
     .ftr {
       display: flex;
@@ -136,6 +155,7 @@
       align-items: center;
       padding: 8px 15px 10px;
       border-top: 1px solid rgba(129,140,248,0.08);
+      margin-top: 4px;
     }
     .ftr a  { font-size: 10px; color: #3a5069; text-decoration: none; transition: color 0.15s; }
     .ftr a:hover { color: #818cf8; }
@@ -146,8 +166,8 @@
   <div class="hdr">
     <span class="hdr-bean">🫘</span>
     <div>
-      <div class="hdr-title">BeanStock Quick</div>
-      <div class="hdr-sub">Connected to localhost:3001</div>
+      <div class="hdr-title">BeanStock Agent</div>
+      <div class="hdr-sub">AI stock analysis · localhost:3001</div>
     </div>
   </div>
 
@@ -157,6 +177,7 @@
   </div>
 
   <div class="body">
+    <!-- Auto-detected ticker on current page -->
     <div class="auto-box" id="autoBox">
       <div class="auto-lbl">Detected on this page</div>
       <button class="auto-btn" id="autoBtn">
@@ -171,6 +192,12 @@
     <div class="row">
       <input id="inp" placeholder="AAPL, TSLA, NVDA…" maxlength="6" autocomplete="off" spellcheck="false" />
       <button class="go-btn" id="goBtn">Go →</button>
+    </div>
+
+    <!-- Session history chips -->
+    <div class="hist-wrap" id="histWrap">
+      <div class="hist-lbl">Recent</div>
+      <div class="hist-list" id="histList"></div>
     </div>
   </div>
 

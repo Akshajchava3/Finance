@@ -1,5 +1,6 @@
 /**
- * BeanStock Extension — Popup
+ * BeanStock Extension + Agent — Popup
+ * Adds: session history chips above the manual search field.
  */
 document.addEventListener('DOMContentLoaded', async () => {
   const statusBar = document.getElementById('statusBar');
@@ -11,8 +12,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const divEl     = document.getElementById('div');
   const inp       = document.getElementById('inp');
   const goBtn     = document.getElementById('goBtn');
+  const histWrap  = document.getElementById('histWrap');
+  const histList  = document.getElementById('histList');
 
-  // ── Server status ──────────────────────────────────────────────────────────
+  // ── Server status ────────────────────────────────────────────────────────────
   async function checkServer() {
     try {
       const r = await fetch('http://localhost:3001/api/status', {
@@ -29,7 +32,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // ── Get auto-detected ticker from the active tab's content script ──────────
+  // ── Get auto-detected ticker from active tab's content script ─────────────
   async function getDetected() {
     return new Promise((resolve) => {
       chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
@@ -42,13 +45,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // ── Send analyze command to content script ─────────────────────────────────
+  // ── Send analyze command to content script ────────────────────────────────
   function sendAnalyze(ticker) {
     chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       if (!tab) return;
-      // Try sending; if content script isn't loaded, inject it first
       chrome.tabs.sendMessage(tab.id, { type: 'ANALYZE', ticker }, (r) => {
-        if (chrome.runtime.lastError) {
+        if (chrome.runtime.lastError || !r?.ok) {
           chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] }, () => {
             chrome.runtime.lastError; // clear error
             setTimeout(() => chrome.tabs.sendMessage(tab.id, { type: 'ANALYZE', ticker }), 300);
@@ -65,12 +67,50 @@ document.addEventListener('DOMContentLoaded', async () => {
     sendAnalyze(t);
   }
 
-  // ── Wire events ────────────────────────────────────────────────────────────
+  // ── Session history ───────────────────────────────────────────────────────
+  const VC = { Buy: { bg: 'rgba(52,211,153,0.14)', bd: 'rgba(52,211,153,0.32)', cl: '#34d399' },
+               Sell:{ bg: 'rgba(251,113,133,0.14)', bd: 'rgba(251,113,133,0.32)', cl: '#fb7185' },
+               Hold:{ bg: 'rgba(251,191,36,0.14)',  bd: 'rgba(251,191,36,0.32)',  cl: '#fbbf24' } };
+
+  function timeAgo(ts) {
+    const s = Math.floor(Date.now() / 1000) - Math.floor(ts / 1000);
+    if (s < 60)    return 'just now';
+    if (s < 3600)  return Math.floor(s / 60)   + 'm';
+    if (s < 86400) return Math.floor(s / 3600)  + 'h';
+    return Math.floor(s / 86400) + 'd';
+  }
+
+  async function loadHistory() {
+    try {
+      const { bsHistory = [] } = await chrome.storage.session.get('bsHistory');
+      if (!bsHistory.length) return;
+
+      histList.innerHTML = '';
+      bsHistory.slice(0, 8).forEach(({ ticker, verdict, time }) => {
+        const c   = VC[verdict] || VC.Hold;
+        const el  = document.createElement('div');
+        el.className = 'hist-chip';
+        el.style.cssText = `background:${c.bg};border-color:${c.bd};color:${c.cl}`;
+        el.innerHTML = `${ticker} <span class="hc-time">${timeAgo(time)}</span>`;
+        el.title     = `Re-analyze ${ticker}`;
+        el.addEventListener('click', () => sendAnalyze(ticker));
+        histList.appendChild(el);
+      });
+
+      histWrap.classList.add('show');
+    } catch (_) {}
+  }
+
+  // ── Wire events ──────────────────────────────────────────────────────────
   goBtn.addEventListener('click', runManual);
   inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') runManual(); });
 
-  // ── Boot (parallel) ────────────────────────────────────────────────────────
-  const [, detected] = await Promise.all([checkServer(), getDetected()]);
+  // ── Boot (parallel) ───────────────────────────────────────────────────────
+  const [, detected] = await Promise.all([
+    checkServer(),
+    getDetected(),
+    loadHistory(),
+  ]);
 
   if (detected) {
     autoSpan.textContent = detected;
