@@ -68,9 +68,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ── Session history ───────────────────────────────────────────────────────
-  const VC = { Buy: { bg: 'rgba(52,211,153,0.14)', bd: 'rgba(52,211,153,0.32)', cl: '#34d399' },
-               Sell:{ bg: 'rgba(251,113,133,0.14)', bd: 'rgba(251,113,133,0.32)', cl: '#fb7185' },
-               Hold:{ bg: 'rgba(251,191,36,0.14)',  bd: 'rgba(251,191,36,0.32)',  cl: '#fbbf24' } };
+  const VC = { Buy:  { bg: '#C8F000', bd: '#C8F000', cl: '#191200' },
+               Sell: { bg: '#FF3300', bd: '#FF3300', cl: '#ffffff' },
+               Hold: { bg: 'transparent', bd: 'rgba(185,140,20,0.45)', cl: '#9A8440' } };
 
   function timeAgo(ts) {
     const s = Math.floor(Date.now() / 1000) - Math.floor(ts / 1000);

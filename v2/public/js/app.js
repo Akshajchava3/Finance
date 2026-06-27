@@ -327,6 +327,15 @@ function updateWsClock() {
   document.getElementById('wsLabel').textContent  = session;
   document.getElementById('wsDot').className      = 'ws-dot ' + dotClass;
   document.getElementById('wsCountdown').textContent = countdown;
+
+  // Sidebar markets-status strip
+  const mLabel = document.getElementById('marketsLabel');
+  const mDot   = document.getElementById('marketsDot');
+  if (mLabel) mLabel.textContent = session.toUpperCase();
+  if (mDot) {
+    mDot.style.background   = dotClass === 'dot-open' ? '#C8F000' : dotClass === 'dot-pre' || dotClass === 'dot-after' ? '#E8A000' : '#5A4A1A';
+    mDot.style.boxShadow    = dotClass === 'dot-open' ? '0 0 6px #C8F000' : 'none';
+  }
 }
 
 updateWsClock();

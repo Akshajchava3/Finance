@@ -130,54 +130,69 @@
 <!-- ── Sidebar ─────────────────────────────────────────────────────────────── -->
 <aside class="sidebar">
   <div class="logo">
-    <span class="logo-mark">🫘</span>
-    <span class="logo-name">BeanStock</span>
-    <span class="logo-v">V3</span>
+    <div class="logo-icon">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10 2.5C7.1 2.5 4.8 4.8 4.8 7.7c0 1.9.9 3.6 2.4 4.6V15h5.6v-2.7c1.5-1 2.4-2.7 2.4-4.6C15.2 4.8 12.9 2.5 10 2.5z" fill="#C8F000"/>
+        <rect x="7" y="15.5" width="6" height="1.5" rx="0.75" fill="#C8F000"/>
+        <rect x="7.5" y="17.2" width="5" height="0.8" rx="0.4" fill="#9AAF00"/>
+      </svg>
+    </div>
+    <div class="logo-text">
+      <span class="logo-bean">BEAN</span>
+      <span class="logo-stock">STOCK</span>
+    </div>
   </div>
+
+  <div class="markets-status" id="marketsStatus">
+    <span class="markets-dot" id="marketsDot"></span>
+    <span id="marketsLabel">MARKETS OPEN</span>
+  </div>
+
   <nav class="nav">
     <button class="nav-btn active" data-view="dashboard">
       <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
-      <span>Dashboard</span>
+      <span>DASHBOARD</span>
     </button>
     <button class="nav-btn" data-view="search">
       <svg class="nav-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-      <span>Search Stock</span>
+      <span>SIGNALS</span>
     </button>
     <button class="nav-btn nav-underdogs" data-view="underdogs">
       <svg class="nav-icon" viewBox="0 0 24 24"><path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 0 0 8 20C19 20 22 3 22 3c-1 2-8 2-13 1 3-1 8-3 11-1 0 0-4.5-4-11.5-1C5 3.5 4 5 4 7c1-2 3-3 5-3z"/></svg>
-      <span>Underdogs</span>
-      <span class="nav-new">NEW</span>
+      <span>WATCHLIST</span>
     </button>
     <button class="nav-btn" data-view="sectors">
       <svg class="nav-icon" viewBox="0 0 24 24"><path d="M11 2v20c-5.07-.5-9-4.79-9-10s3.93-9.5 9-10zm2.03 0v8.99H22c-.47-4.74-4.24-8.52-8.97-8.99zm0 11.01V22c4.74-.47 8.5-4.25 8.97-8.99h-8.97z"/></svg>
-      <span>Sectors</span>
+      <span>SECTORS</span>
     </button>
     <button class="nav-btn" data-view="ipos">
       <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
-      <span>IPO Calendar</span>
-      <span class="nav-new">NEW</span>
+      <span>LIVE FEED</span>
     </button>
     <button class="nav-btn" data-view="pennystocks">
       <svg class="nav-icon" viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
-      <span>Penny Stocks</span>
-      <span class="nav-new">NEW</span>
+      <span>PENNY STOCKS</span>
     </button>
     <button class="nav-btn" data-view="reddit">
       <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
-      <span>Reddit Feed</span>
+      <span>REDDIT FEED</span>
     </button>
     <button class="nav-btn" data-view="learn">
       <svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z"/></svg>
-      <span>Trading 101</span>
+      <span>TRADING 101</span>
     </button>
     <button class="nav-btn" data-view="connect">
       <svg class="nav-icon" viewBox="0 0 24 24"><path d="M17 7H13V9H17C18.65 9 20 10.35 20 12C20 13.65 18.65 15 17 15H13V17H17C19.76 17 22 14.76 22 12C22 9.24 19.76 7 17 7ZM11 15H7C5.35 15 4 13.65 4 12C4 10.35 5.35 9 7 9H11V7H7C4.24 7 2 9.24 2 12C2 14.76 4.24 17 7 17H11V15ZM8 11H16V13H8V11Z"/></svg>
-      <span>Connect</span>
-      <span class="nav-new">NEW</span>
+      <span>CONNECT</span>
     </button>
   </nav>
+
   <div class="sidebar-footer">
-    <div class="ws-clock" id="wsClock">
+    <button class="nav-btn" data-view="settings" style="border-top:1px solid var(--border);margin-top:auto">
+      <svg class="nav-icon" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+      <span>SETTINGS</span>
+    </button>
+    <div class="ws-clock" id="wsClock" style="display:none">
       <div class="ws-clock-time" id="wsTime">--:--:-- --</div>
       <div class="ws-clock-session">
         <span class="ws-dot" id="wsDot"></span>

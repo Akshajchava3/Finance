@@ -142,19 +142,17 @@
 
       #${PANEL_ID} {
         all:initial!important;
-        position:fixed!important; top:60px!important; right:0!important;
-        width:334px!important; max-height:calc(100vh - 72px)!important;
+        position:fixed!important; top:0!important; right:0!important;
+        width:334px!important; max-height:100vh!important;
         display:flex!important; flex-direction:column!important;
         font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif!important;
-        font-size:13px!important; color:#e4ecff!important;
-        background:rgba(4,9,24,0.97)!important;
-        backdrop-filter:blur(32px) saturate(2)!important;
-        -webkit-backdrop-filter:blur(32px) saturate(2)!important;
-        border:1px solid rgba(129,140,248,0.22)!important; border-right:none!important;
-        border-radius:14px 0 0 14px!important;
-        box-shadow:-8px 0 56px rgba(0,0,0,0.72), inset 0 0 0 1px rgba(129,140,248,0.04)!important;
+        font-size:13px!important; color:#E8D870!important;
+        background:#191200!important;
+        border-left:1px solid rgba(185,140,20,0.35)!important;
+        border-radius:0!important;
+        box-shadow:-4px 0 32px rgba(0,0,0,0.6)!important;
         z-index:2147483647!important; overflow:hidden!important;
-        animation:bs-in 0.34s cubic-bezier(0.34,1.15,0.7,1) both!important;
+        animation:bs-in 0.28s ease both!important;
         transition:width 0.24s ease,opacity 0.2s ease!important;
       }
       #${PANEL_ID}.bs-mini { width:100px!important; }
@@ -162,29 +160,28 @@
 
       /* $TICKER highlights on non-finance pages */
       .${WRAP_CLS} {
-        color:#818cf8!important; cursor:pointer!important;
-        border-bottom:1px dotted rgba(129,140,248,0.6)!important;
+        color:#C8F000!important; cursor:pointer!important;
+        border-bottom:1px dotted rgba(200,240,0,0.5)!important;
         border-radius:2px!important;
         transition:background 0.12s!important;
       }
-      .${WRAP_CLS}:hover { background:rgba(129,140,248,0.12)!important; }
+      .${WRAP_CLS}:hover { background:rgba(200,240,0,0.10)!important; }
 
       /* Selection bubble */
       #bs-sel-bubble {
         all:initial!important;
         position:fixed!important; z-index:2147483646!important;
-        background:rgba(4,9,24,0.96)!important;
-        border:1px solid rgba(129,140,248,0.28)!important; border-radius:8px!important;
+        background:#191200!important;
+        border:1px solid rgba(200,240,0,0.35)!important; border-radius:3px!important;
         padding:7px 13px!important; font-size:12px!important; font-weight:700!important;
-        color:#818cf8!important; cursor:pointer!important;
-        backdrop-filter:blur(16px)!important;
+        color:#C8F000!important; cursor:pointer!important;
         box-shadow:0 4px 20px rgba(0,0,0,0.5)!important;
         font-family:Inter,-apple-system,sans-serif!important;
         white-space:nowrap!important;
         animation:bs-in 0.18s ease both!important;
         transition:opacity 0.15s!important;
       }
-      #bs-sel-bubble:hover { background:rgba(10,18,48,0.98)!important; }
+      #bs-sel-bubble:hover { background:rgba(26,20,0,0.98)!important; }
     `;
     (document.head || document.documentElement).appendChild(s);
   }
@@ -212,16 +209,15 @@
     activeTicker = null; minimized = false;
   }
 
-  const VC = { Buy:'#34d399', Sell:'#fb7185', Hold:'#fbbf24' };
+  const VC = { Buy:'#C8F000', Sell:'#FF3300', Hold:'rgba(185,140,20,0.8)' };
 
   function hdl(ticker) {
-    // Header strip
     return `<div style="all:unset;display:flex;align-items:center;gap:8px;padding:11px 14px;
-      border-bottom:1px solid rgba(129,140,248,0.12);background:rgba(129,140,248,0.05);flex-shrink:0">
+      border-bottom:1px solid rgba(185,140,20,0.20);background:#111000;flex-shrink:0">
       <span style="font-size:13px">🫘</span>
-      <span style="font-weight:800;font-size:12px;color:#818cf8;flex:1;letter-spacing:.03em">BEANSTOCK AGENT</span>
-      <button id="bs-min"   style="all:unset;cursor:pointer;color:#4a6080;font-size:16px;padding:1px 5px;border-radius:3px;line-height:1" title="Minimize">−</button>
-      <button id="bs-close" style="all:unset;cursor:pointer;color:#4a6080;font-size:14px;padding:1px 5px;border-radius:3px;line-height:1" title="Close">✕</button>
+      <span style="font-weight:800;font-size:11px;color:#C8F000;flex:1;letter-spacing:2px;text-transform:uppercase;font-family:'Space Grotesk',Inter,sans-serif">BEANSTOCK</span>
+      <button id="bs-min"   style="all:unset;cursor:pointer;color:#5A4A1A;font-size:16px;padding:1px 5px;border-radius:2px;line-height:1" title="Minimize">−</button>
+      <button id="bs-close" style="all:unset;cursor:pointer;color:#5A4A1A;font-size:14px;padding:1px 5px;border-radius:2px;line-height:1" title="Close">✕</button>
     </div>`;
   }
 
@@ -248,8 +244,8 @@
     const p = getPanel();
     p.innerHTML = hdl(ticker) + `
       <div id="bs-body" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px;gap:12px">
-        <span style="font-size:36px;display:inline-block;animation:bs-spin 0.85s linear infinite">🫘</span>
-        <div style="font-size:12px;color:#5a7093">Analyzing <strong style="color:#c4d4f0">${ticker}</strong>…</div>
+        <span style="font-size:36px;display:inline-block;animation:bs-spin 0.85s linear infinite;filter:hue-rotate(60deg) saturate(2)">🫘</span>
+        <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#5A4A1A">Analyzing <strong style="color:#C8F000">${ticker}</strong>…</div>
       </div>`;
     wireButtons(ticker);
   }
@@ -259,14 +255,14 @@
     p.innerHTML = hdl(ticker) + `
       <div id="bs-body" style="flex:1;padding:28px 18px;text-align:center">
         <div style="font-size:26px;margin-bottom:10px">⚠️</div>
-        <div style="color:#fb7185;font-size:13px;font-weight:700;margin-bottom:8px">Can't reach BeanStock</div>
-        <div style="color:#3a5069;font-size:11px;line-height:1.7;margin-bottom:14px">
+        <div style="color:#FF3300;font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Can't reach BeanStock</div>
+        <div style="color:#5A4A1A;font-size:11px;line-height:1.7;margin-bottom:14px">
           Start the server in your terminal:<br>
-          <code style="color:#818cf8;background:rgba(129,140,248,0.1);padding:2px 7px;border-radius:4px">node server/index.js</code>
+          <code style="color:#C8F000;background:rgba(200,240,0,0.08);padding:2px 7px;border-radius:2px">node server/index.js</code>
         </div>
         <button id="bs-retry" style="all:unset;cursor:pointer;display:inline-block;padding:7px 16px;
-          background:rgba(129,140,248,0.14);border:1px solid rgba(129,140,248,0.26);
-          border-radius:8px;font-size:12px;font-weight:700;color:#818cf8">Retry</button>
+          background:rgba(200,240,0,0.10);border:1px solid rgba(200,240,0,0.30);
+          border-radius:2px;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#C8F000">Retry</button>
       </div>`;
     wireButtons(ticker);
     document.getElementById('bs-retry')?.addEventListener('click', () => analyze(ticker, true));
@@ -284,94 +280,95 @@
     // News items
     const newsHtml = (d.news || []).map(n => `
       <a href="${n.url || '#'}" target="_blank" rel="noopener" style="all:unset;display:block;cursor:pointer;
-        padding:7px 0;border-bottom:1px solid rgba(129,140,248,0.07)">
-        <div style="font-size:11px;color:#b4c4e0;line-height:1.5;margin-bottom:2px">
+        padding:7px 0;border-bottom:1px solid rgba(185,140,20,0.12)">
+        <div style="font-size:11px;color:#E8D870;line-height:1.5;margin-bottom:2px">
           ${(n.headline || '').slice(0, 80)}${(n.headline || '').length > 80 ? '…' : ''}
         </div>
-        <div style="font-size:10px;color:#3a5069">
+        <div style="font-size:10px;color:#5A4A1A">
           ${n.source ? n.source + ' · ' : ''}${n.time ? timeAgo(n.time) : ''}
         </div>
-      </a>`).join('') || '<div style="font-size:11px;color:#3a5069">No recent news</div>';
+      </a>`).join('') || '<div style="font-size:11px;color:#5A4A1A">No recent news</div>';
 
     // Peers placeholder — will be replaced async
     const peersPlaceholder = (d.peers || []).length
       ? `<div id="bs-peers-wrap" style="margin-top:6px">
-           <div style="font-size:10px;color:#3a5069;animation:bs-pulse 1.2s infinite">Fetching peer data…</div>
+           <div style="font-size:10px;color:#5A4A1A;animation:bs-pulse 1.2s infinite">Fetching peer data…</div>
          </div>`
-      : `<div id="bs-peers-wrap" style="font-size:11px;color:#3a5069;margin-top:4px">No peer data</div>`;
+      : `<div id="bs-peers-wrap" style="font-size:11px;color:#5A4A1A;margin-top:4px">No peer data</div>`;
 
     p.innerHTML = hdl(ticker) + `
       <div id="bs-body" style="overflow-y:auto;flex:1;padding:13px">
 
         <!-- Price row -->
         <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
-          <span style="font-size:20px;font-weight:900;color:#e4ecff">${ticker}</span>
-          <span style="font-size:17px;font-weight:700;color:#c4d4f0">$${d.price}</span>
-          <span style="font-size:11px;font-weight:700;color:${up ? '#34d399' : '#fb7185'};margin-left:auto">
+          <span style="font-size:20px;font-weight:900;color:#E8D870;font-family:'JetBrains Mono',monospace">${ticker}</span>
+          <span style="font-size:17px;font-weight:700;color:#9A8440;font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums">$${d.price}</span>
+          <span style="font-size:11px;font-weight:700;color:${up ? '#C8F000' : '#FF3300'};margin-left:auto;font-family:'JetBrains Mono',monospace">
             ${up ? '▲' : '▼'} ${Math.abs(d.change).toFixed(2)}%
           </span>
         </div>
 
         <!-- Verdict -->
-        <div style="background:${vc}18;border:1px solid ${vc}40;border-radius:11px;
-          padding:13px 10px;text-align:center;margin:10px 0">
-          <div style="font-size:28px;font-weight:900;color:${vc};line-height:1">${d.verdict}</div>
-          <div style="font-size:10px;color:#5a7093;margin-top:3px;font-weight:600">${d.confidence}</div>
+        <div style="background:${vc === '#C8F000' ? 'rgba(200,240,0,0.08)' : vc === '#FF3300' ? 'rgba(255,51,0,0.08)' : 'rgba(185,140,20,0.08)'};
+          border:1px solid ${vc === '#C8F000' ? 'rgba(200,240,0,0.35)' : vc === '#FF3300' ? 'rgba(255,51,0,0.35)' : 'rgba(185,140,20,0.35)'};
+          border-radius:3px;padding:13px 10px;text-align:center;margin:10px 0">
+          <div style="font-size:22px;font-weight:900;color:${vc};letter-spacing:2px;text-transform:uppercase;font-family:'Space Grotesk',Inter,sans-serif">${d.verdict}</div>
+          <div style="font-size:10px;color:#5A4A1A;margin-top:3px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase">${d.confidence}</div>
         </div>
 
         <!-- Agent reasoning -->
-        <p style="font-size:11px;line-height:1.68;color:#7090b0;margin:0 0 12px;font-style:italic">
+        <p style="font-size:11px;line-height:1.68;color:#9A8440;margin:0 0 12px;font-style:italic">
           ${d.agentReason || d.advice || ''}
         </p>
 
         <!-- Support / Resistance bar -->
         <div style="margin-bottom:13px">
           <div style="display:flex;justify-content:space-between;font-size:9px;font-weight:700;
-            text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">
-            <span style="color:#34d399">Support $${d.support}</span>
-            <span style="color:#fb7185">Resistance $${d.resistance}</span>
+            text-transform:uppercase;letter-spacing:1.5px;margin-bottom:5px">
+            <span style="color:#C8F000">Support $${d.support}</span>
+            <span style="color:#FF3300">Resistance $${d.resistance}</span>
           </div>
-          <div style="height:5px;background:rgba(129,140,248,0.1);border-radius:4px;position:relative;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#34d399,#818cf8);border-radius:4px;transition:width 0.6s ease"></div>
+          <div style="height:4px;background:rgba(185,140,20,0.12);border-radius:2px;position:relative;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#C8F000,#E8A000);border-radius:2px;transition:width 0.6s ease"></div>
           </div>
-          <div style="font-size:9px;color:#5a7093;margin-top:3px;text-align:center">
-            Current $${d.price} · ${pct.toFixed(0)}% between zones
+          <div style="font-size:9px;color:#5A4A1A;margin-top:3px;text-align:center;font-family:'JetBrains Mono',monospace">
+            $${d.price} · ${pct.toFixed(0)}% between zones
           </div>
         </div>
 
         <!-- Peer comparison -->
-        <div style="border-top:1px solid rgba(129,140,248,0.1);padding-top:11px;margin-bottom:11px">
-          <div style="font-size:10px;color:#4a6080;text-transform:uppercase;letter-spacing:.07em;
+        <div style="border-top:1px solid rgba(185,140,20,0.18);padding-top:11px;margin-bottom:11px">
+          <div style="font-size:9px;color:#5A4A1A;text-transform:uppercase;letter-spacing:2px;
             font-weight:700;margin-bottom:7px">Sector Peers</div>
           ${peersPlaceholder}
         </div>
 
         <!-- News -->
-        <div style="border-top:1px solid rgba(129,140,248,0.1);padding-top:11px;margin-bottom:11px">
-          <div style="font-size:10px;color:#4a6080;text-transform:uppercase;letter-spacing:.07em;
+        <div style="border-top:1px solid rgba(185,140,20,0.18);padding-top:11px;margin-bottom:11px">
+          <div style="font-size:9px;color:#5A4A1A;text-transform:uppercase;letter-spacing:2px;
             font-weight:700;margin-bottom:7px">Recent News</div>
           ${newsHtml}
         </div>
 
         <!-- Detail row -->
-        <div style="background:rgba(8,16,42,0.7);border:1px solid rgba(129,140,248,0.09);
-          border-radius:8px;padding:10px;font-size:11px;margin-bottom:13px">
-          ${d.technical ? `<div style="color:#5a7093;margin-bottom:4px">Technicals: <span style="color:#b4c4e0">${d.technical}</span></div>` : ''}
-          ${d.pe        ? `<div style="color:#5a7093;margin-bottom:4px">Valuation: <span style="color:#b4c4e0">${d.pe}</span></div>` : ''}
-          ${d.w52       ? `<div style="color:#5a7093;margin-bottom:4px">52W range: <span style="color:#b4c4e0">${d.w52}</span></div>` : ''}
-          ${d.dividend  ? `<div style="color:#5a7093">Dividend: <span style="color:#34d399">${d.dividend}</span></div>` : ''}
+        <div style="background:rgba(26,20,0,0.6);border:1px solid rgba(185,140,20,0.15);
+          border-radius:3px;padding:10px;font-size:11px;margin-bottom:13px">
+          ${d.technical ? `<div style="color:#5A4A1A;margin-bottom:4px">Technicals: <span style="color:#E8D870">${d.technical}</span></div>` : ''}
+          ${d.pe        ? `<div style="color:#5A4A1A;margin-bottom:4px">Valuation: <span style="color:#E8D870">${d.pe}</span></div>` : ''}
+          ${d.w52       ? `<div style="color:#5A4A1A;margin-bottom:4px">52W range: <span style="color:#E8D870">${d.w52}</span></div>` : ''}
+          ${d.dividend  ? `<div style="color:#5A4A1A">Dividend: <span style="color:#C8F000">${d.dividend}</span></div>` : ''}
         </div>
 
         <!-- Footer -->
         <div style="text-align:center;margin-bottom:10px">
           <a href="${HOST}/?quick=${ticker}" target="_blank"
              style="all:unset;display:inline-block;padding:8px 18px;
-             background:linear-gradient(135deg,#818cf8,#22d3ee);
-             border-radius:8px;font-size:12px;font-weight:700;color:#fff;cursor:pointer">
-            Full analysis →
+             background:#C8F000;border-radius:3px;
+             font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#191200;cursor:pointer">
+            Full Analysis →
           </a>
         </div>
-        <div style="text-align:center;font-size:9px;color:#1e2d42">
+        <div style="text-align:center;font-size:9px;color:#3A2D00;letter-spacing:0.5px">
           Not financial advice · BeanStock Agent
         </div>
       </div>`;
@@ -393,25 +390,27 @@
       const chips = results
         .filter(r => !r.error && r.ticker !== excludeTicker)
         .map(r => {
-          const c = VC[r.verdict] || '#fbbf24';
+          const c = VC[r.verdict] || 'rgba(185,140,20,0.8)';
           const chg = r.change >= 0;
           return `<span class="bs-peer-chip" data-ticker="${r.ticker}"
             style="all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;
-            padding:4px 9px;border-radius:6px;font-size:11px;font-weight:700;
-            background:${c}14;border:1px solid ${c}38;color:${c};margin:0 4px 4px 0">
+            padding:3px 8px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:0.5px;
+            background:${c === '#C8F000' ? 'rgba(200,240,0,0.10)' : c === '#FF3300' ? 'rgba(255,51,0,0.10)' : 'rgba(185,140,20,0.08)'};
+            border:1px solid ${c === '#C8F000' ? 'rgba(200,240,0,0.30)' : c === '#FF3300' ? 'rgba(255,51,0,0.30)' : 'rgba(185,140,20,0.30)'};
+            color:${c};margin:0 4px 4px 0;font-family:'JetBrains Mono',monospace">
             ${r.ticker}
-            <span style="font-size:9px;opacity:0.75">${r.verdict}</span>
-            <span style="font-size:9px;color:${chg ? '#34d399' : '#fb7185'}">${chg ? '▲' : '▼'}${Math.abs(r.change).toFixed(1)}%</span>
+            <span style="font-size:8px;opacity:0.75">${r.verdict}</span>
+            <span style="font-size:9px;color:${chg ? '#C8F000' : '#FF3300'}">${chg ? '▲' : '▼'}${Math.abs(r.change).toFixed(1)}%</span>
           </span>`;
         }).join('');
 
-      wrap.innerHTML = chips || '<div style="font-size:11px;color:#3a5069">No peer data</div>';
+      wrap.innerHTML = chips || '<div style="font-size:11px;color:#5A4A1A">No peer data</div>';
       wrap.querySelectorAll('.bs-peer-chip').forEach(chip => {
         chip.addEventListener('click', () => analyze(chip.dataset.ticker, true));
       });
     } catch (_) {
       const wrap2 = document.getElementById('bs-peers-wrap');
-      if (wrap2) wrap2.innerHTML = '<div style="font-size:11px;color:#3a5069">Peer data unavailable</div>';
+      if (wrap2) wrap2.innerHTML = '<div style="font-size:11px;color:#5A4A1A">Peer data unavailable</div>';
     }
   }
 
