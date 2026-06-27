@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 280px;
+      background: #050912;
+      color: #e4ecff;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+    }
+
+    /* ── Header ── */
+    .hdr {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 15px;
+      background: rgba(129,140,248,0.07);
+      border-bottom: 1px solid rgba(129,140,248,0.13);
+    }
+    .hdr-bean  { font-size: 20px; }
+    .hdr-title { font-weight: 800; font-size: 14px; color: #e4ecff; }
+    .hdr-sub   { font-size: 10px; color: #3a5069; margin-top: 2px; }
+
+    /* ── Status bar ── */
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 15px;
+      font-size: 11px;
+      background: rgba(2,6,18,0.7);
+      border-bottom: 1px solid rgba(129,140,248,0.08);
+      color: #4a6080;
+    }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+      background: #2a3d56; transition: background 0.3s;
+    }
+    .dot.ok  { background: #34d399; box-shadow: 0 0 6px rgba(52,211,153,0.6); }
+    .dot.err { background: #fb7185; }
+    .status.ok  { color: #34d399; }
+    .status.err { color: #fb7185; }
+
+    /* ── Body ── */
+    .body { padding: 13px 15px 10px; }
+
+    /* Auto-detected pill */
+    .auto-box {
+      display: none;
+      background: rgba(129,140,248,0.08);
+      border: 1px solid rgba(129,140,248,0.18);
+      border-radius: 10px;
+      padding: 9px 11px;
+      margin-bottom: 11px;
+    }
+    .auto-box.show { display: block; }
+    .auto-lbl { font-size: 9px; color: #3a5069; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px; font-weight: 700; }
+    .auto-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 8px 11px;
+      background: rgba(129,140,248,0.1);
+      border: 1px solid rgba(129,140,248,0.22);
+      border-radius: 7px;
+      color: #818cf8;
+      font-size: 14px;
+      font-weight: 900;
+      cursor: pointer;
+      transition: background 0.15s;
+      font-family: inherit;
+    }
+    .auto-btn:hover { background: rgba(129,140,248,0.18); }
+    .auto-btn span  { font-size: 11px; font-weight: 600; color: #5a7093; }
+
+    /* Divider */
+    .div {
+      display: none;
+      align-items: center;
+      gap: 7px;
+      margin: 2px 0 11px;
+      font-size: 10px;
+      color: #2a3d56;
+    }
+    .div.show { display: flex; }
+    .div::before, .div::after { content:''; flex:1; height:1px; background: rgba(129,140,248,0.1); }
+
+    /* Manual search */
+    .search-lbl { font-size: 10px; color: #3a5069; margin-bottom: 7px; }
+    .row { display: flex; gap: 7px; }
+
+    input {
+      flex: 1;
+      background: rgba(8,16,42,0.85);
+      border: 1px solid rgba(129,140,248,0.17);
+      border-radius: 8px;
+      padding: 9px 11px;
+      color: #e4ecff;
+      font-size: 13px;
+      font-family: inherit;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus { border-color: #818cf8; }
+    input::placeholder { font-weight: 400; text-transform: none; letter-spacing: 0; color: #2a3d56; }
+
+    .go-btn {
+      padding: 9px 13px;
+      background: linear-gradient(135deg, #818cf8, #22d3ee);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.15s, transform 0.1s;
+      font-family: inherit;
+    }
+    .go-btn:hover  { opacity: .88; }
+    .go-btn:active { transform: scale(.96); }
+
+    /* Footer */
+    .ftr {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 15px 10px;
+      border-top: 1px solid rgba(129,140,248,0.08);
+    }
+    .ftr a  { font-size: 10px; color: #3a5069; text-decoration: none; transition: color 0.15s; }
+    .ftr a:hover { color: #818cf8; }
+    .ftr span { font-size: 10px; color: #1e2d42; }
+  </style>
+</head>
+<body>
+  <div class="hdr">
+    <span class="hdr-bean">🫘</span>
+    <div>
+      <div class="hdr-title">BeanStock Quick</div>
+      <div class="hdr-sub">Connected to localhost:3001</div>
+    </div>
+  </div>
+
+  <div class="status" id="statusBar">
+    <div class="dot" id="dot"></div>
+    <span id="statusTxt">Checking server…</span>
+  </div>
+
+  <div class="body">
+    <div class="auto-box" id="autoBox">
+      <div class="auto-lbl">Detected on this page</div>
+      <button class="auto-btn" id="autoBtn">
+        <span id="autoTicker">—</span>
+        <span>Analyze →</span>
+      </button>
+    </div>
+
+    <div class="div" id="div">or</div>
+
+    <div class="search-lbl">Analyze any ticker:</div>
+    <div class="row">
+      <input id="inp" placeholder="AAPL, TSLA, NVDA…" maxlength="6" autocomplete="off" spellcheck="false" />
+      <button class="go-btn" id="goBtn">Go →</button>
+    </div>
+  </div>
+
+  <div class="ftr">
+    <a href="http://localhost:3001" target="_blank">Open BeanStock ↗</a>
+    <span>Not financial advice</span>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

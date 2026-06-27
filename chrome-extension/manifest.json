@@ -1,0 +1,84 @@
+{
+  "manifest_version": 3,
+  "name": "BeanStock Quick Analysis",
+  "short_name": "BeanStock",
+  "version": "1.0.0",
+  "description": "Auto-detects tickers on any stock site and shows Buy/Hold/Sell analysis from your local BeanStock server. Zero clicks required.",
+
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "http://localhost:3001/*",
+    "*://*.robinhood.com/*",
+    "*://*.webull.com/*",
+    "*://*.finance.yahoo.com/*",
+    "*://*.marketwatch.com/*",
+    "*://*.seekingalpha.com/*",
+    "*://*.tradingview.com/*",
+    "*://www.google.com/finance*",
+    "*://*.finviz.com/*",
+    "*://*.stockanalysis.com/*",
+    "*://*.fidelity.com/*",
+    "*://*.schwab.com/*",
+    "*://*.tdameritrade.com/*",
+    "*://*.wsj.com/*",
+    "*://*.bloomberg.com/*",
+    "*://*.cnbc.com/*",
+    "*://*.nasdaq.com/*",
+    "*://*.fool.com/*",
+    "*://*.barrons.com/*",
+    "*://*.zacks.com/*"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.robinhood.com/*",
+        "*://*.webull.com/*",
+        "*://*.finance.yahoo.com/*",
+        "*://*.marketwatch.com/*",
+        "*://*.seekingalpha.com/*",
+        "*://*.tradingview.com/*",
+        "*://www.google.com/finance*",
+        "*://*.finviz.com/*",
+        "*://*.stockanalysis.com/*",
+        "*://*.fidelity.com/*",
+        "*://*.schwab.com/*",
+        "*://*.tdameritrade.com/*",
+        "*://*.wsj.com/*",
+        "*://*.bloomberg.com/*",
+        "*://*.cnbc.com/*",
+        "*://*.nasdaq.com/*",
+        "*://*.fool.com/*",
+        "*://*.barrons.com/*",
+        "*://*.zacks.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "BeanStock — Analyze this stock",
+    "default_icon": {
+      "16":  "icons/icon16.png",
+      "48":  "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+
+  "icons": {
+    "16":  "icons/icon16.png",
+    "48":  "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "background": {
+    "service_worker": "background.js"
+  }
+}
