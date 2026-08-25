@@ -1,5 +1,11 @@
 const https = require('https');
+const NodeCache = require('node-cache');
 const { analyzePosts } = require('./analyzer');
+
+// The feeds are the same for every ticker — cache the parsed items once
+// instead of refetching WSJ on every single ticker's sentiment request.
+const cache = new NodeCache({ stdTTL: 300 });
+const CACHE_KEY = 'wsj:items';
 
 const FEEDS = [
   'https://feeds.a.dj.com/rss/RSSMarketsMain.xml',
@@ -36,16 +42,21 @@ function parseItems(xml) {
   return items;
 }
 
-async function getWSJSentiment(ticker) {
+async function getFeedItems() {
+  if (cache.has(CACHE_KEY)) return cache.get(CACHE_KEY);
+
   const results = await Promise.allSettled(FEEDS.map(fetchXML));
   const allItems = [];
-
   for (const r of results) {
-    if (r.status === 'fulfilled') {
-      allItems.push(...parseItems(r.value));
-    }
+    if (r.status === 'fulfilled') allItems.push(...parseItems(r.value));
   }
 
+  if (allItems.length) cache.set(CACHE_KEY, allItems);
+  return allItems;
+}
+
+async function getWSJSentiment(ticker) {
+  const allItems = await getFeedItems();
   if (!allItems.length) return null;
 
   // Filter items mentioning the ticker

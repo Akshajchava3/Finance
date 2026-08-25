@@ -1,35 +1,20 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
 const path = require('path');
-const stocksRouter = require('./routes/stocks');
-const sentimentRouter = require('./routes/sentiment');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+
+const express = require('express');
+const cors    = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-if (!process.env.FINNHUB_API_KEY) {
-  console.warn('[warn] FINNHUB_API_KEY not set — stock data will fail. Copy .env.example to .env');
-}
-
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
-app.use('/api/stocks', stocksRouter);
-app.use('/api/sentiment', sentimentRouter);
+app.use('/api/stocks',    require('./routes/stocks'));
+app.use('/api/sentiment', require('./routes/sentiment'));
 
 app.get('/api/status', (req, res) => {
-  res.json({
-    finnhub: !!process.env.FINNHUB_API_KEY,
-    reddit: true, // public JSON API — no credentials needed
-  });
+  res.json({ finnhub: !!process.env.FINNHUB_API_KEY, reddit: true });
 });
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
-});
-
-app.listen(PORT, () => {
-  console.log(`\n🫘 BeanStock running at http://localhost:${PORT}\n`);
-});
+const PORT = process.env.PORT2 || 3001;
+app.listen(PORT, () => console.log(`🫘 BeanStock running at http://localhost:${PORT}`));

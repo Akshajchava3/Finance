@@ -1,7 +1,7 @@
 {
   "name": "beanstock",
-  "version": "1.0.0",
-  "description": "Sentiment analyzer + beginner stock tool powered by Reddit & Finnhub",
+  "version": "2.0.0",
+  "description": "BeanStock — Sentiment, Underdogs, guided onboarding & live analysis",
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",

@@ -64,7 +64,11 @@ async function searchPosts(ticker, limit = 30) {
   const cacheKey = `search_rss_${ticker}`;
   if (cache.has(cacheKey)) return cache.get(cacheKey);
 
-  const subs = ['stocks', 'wallstreetbets', 'investing', 'StockMarket'];
+  const subs = [
+    'stocks', 'wallstreetbets', 'investing', 'StockMarket',
+    'options', 'dividends', 'ValueInvesting', 'SecurityAnalysis',
+    'thetagang', 'StocksAndTrading', 'pennystocks', 'smallstreetbets',
+  ];
   const allPosts = [];
 
   await Promise.allSettled(
@@ -87,8 +91,8 @@ async function getTrending() {
   const posts = [];
 
   await Promise.allSettled(
-    ['stocks', 'wallstreetbets'].map(async (sub) => {
-      const xml = await fetchRSS(`/r/${sub}/hot.rss?limit=20`);
+    ['stocks', 'wallstreetbets', 'investing', 'options', 'StockMarket'].map(async (sub) => {
+      const xml = await fetchRSS(`/r/${sub}/hot.rss?limit=15`);
       posts.push(...parseAtomFeed(xml, sub));
     })
   );
